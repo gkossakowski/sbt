@@ -2,3 +2,8 @@ target/
 project/boot/
 .release.sbt
 __pycache__
+.project
+.classpath
+.settings
+.cache
+.DS_Store

@@ -35,7 +35,7 @@ object APIUtil
 	}
 
 	def minimize(api: SourceAPI): SourceAPI =
-		new SourceAPI(api.packages, minimizeDefinitions(api.definitions))
+		new SourceAPI(api.packages, minimizeDefinitions(api.definitions), api.usedNames)
 	def minimizeDefinitions(ds: Array[Definition]): Array[Definition] =
 		ds flatMap minimizeDefinition
 	def minimizeDefinition(d: Definition): Array[Definition] =

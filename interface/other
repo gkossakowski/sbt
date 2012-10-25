@@ -8,6 +8,7 @@ Source
 SourceAPI
 	packages : Package*
 	definitions: Definition*
+	usedNames: String*
 
 OutputSetting
 	sourceDirectory: String

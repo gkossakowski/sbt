@@ -42,12 +42,25 @@ final class API(val global: CallbackGlobal) extends Compat
 			debug("Traversing " + sourceFile)
 			val traverser = new TopLevelHandler(sourceFile)
 			traverser.apply(unit.body)
+			val names = extractUsedNames(unit.body)
 			val packages = traverser.packages.toArray[String].map(p => new xsbti.api.Package(p))
-			val source = new xsbti.api.SourceAPI(packages, traverser.definitions.toArray[xsbti.api.Definition])
+			val source = new xsbti.api.SourceAPI(packages, traverser.definitions.toArray[xsbti.api.Definition], names.toArray)
 			forceStructures()
 			clearCaches()
 			callback.api(sourceFile, source)
 		}
+	}
+	
+	def extractUsedNames(tree: Tree): Set[String] = {
+	  val namesBuffer = collection.mutable.ListBuffer.empty[String]
+	  tree foreach {
+	    case s: Select =>
+	      namesBuffer += s.symbol.name.toString
+	    case i: Import =>
+	      namesBuffer ++= i.selectors.flatMap(sel => List(sel.name.toString, sel.rename.toString))
+	    case _ =>
+	  }
+	  namesBuffer.toSet
 	}
 
 	// this cache reduces duplicate work both here and when persisting

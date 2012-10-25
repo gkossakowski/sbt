@@ -69,7 +69,7 @@ private[sbt] object Analyze
 
 		for( source <- sources filterNot sourceToClassFiles.keySet ) {
 			analysis.beginSource(source)
-			analysis.api(source, new xsbti.api.SourceAPI(Array(), Array()))
+			analysis.api(source, new xsbti.api.SourceAPI(Array(), Array(), Array()))
 			analysis.endSource(source)
 		}
 	}

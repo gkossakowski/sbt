@@ -14,7 +14,7 @@ object ClassToAPI
 	{
 		val pkgs = packages(c).map(p => new api.Package(p))
 		val defs = c.filter(isTopLevel).flatMap(toDefinitions(new mutable.HashMap))
-		new api.SourceAPI(pkgs.toArray, defs.toArray)
+		new api.SourceAPI(pkgs.toArray, defs.toArray, sys.error("TODO"))
 	}
 
 	// Avoiding implicit allocation.

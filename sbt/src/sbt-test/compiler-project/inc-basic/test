@@ -1,0 +1,2 @@
+> dump-analysis
+$ must-mirror analysis-dump.expected target/analysis-dump.txt

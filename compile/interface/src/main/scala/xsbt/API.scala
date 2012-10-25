@@ -42,7 +42,7 @@ final class API(val global: CallbackGlobal) extends Compat
 			debug("Traversing " + sourceFile)
 			val traverser = new TopLevelHandler(sourceFile)
 			traverser.apply(unit.body)
-			val names = extractUsedNames(unit.body)
+			val names = extractUsedNames(unit.source.file, unit.body)
 			val packages = traverser.packages.toArray[String].map(p => new xsbti.api.Package(p))
 			val source = new xsbti.api.SourceAPI(packages, traverser.definitions.toArray[xsbti.api.Definition], names.toArray)
 			forceStructures()
@@ -51,14 +51,13 @@ final class API(val global: CallbackGlobal) extends Compat
 		}
 	}
 	
-	def extractUsedNames(tree: Tree): Set[String] = {
+	def extractUsedNames(sourceFile: io.AbstractFile, tree: Tree): Set[String] = {
 	  val namesBuffer = collection.mutable.ListBuffer.empty[String]
 	  tree foreach {
-	    case s: Select =>
-	      namesBuffer += s.symbol.name.toString
-	    case i: Import =>
-	      namesBuffer ++= i.selectors.flatMap(sel => List(sel.name.toString, sel.rename.toString))
-	    case _ =>
+	    case _: DefTree | _: Template => ()
+	    case t if t.hasSymbol && !t.symbol.isSynthetic && !(t.symbol.ownerChain.exists(_.sourceFile == sourceFile)) =>
+	      namesBuffer += t.symbol.name.toString
+	    case _ => ()
 	  }
 	  namesBuffer.toSet
 	}

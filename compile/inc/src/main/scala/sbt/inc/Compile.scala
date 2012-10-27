@@ -53,6 +53,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	import collection.mutable.{HashMap, HashSet, ListBuffer, Map, Set}
 	
 	private[this] val apis = new HashMap[File, (Int, SourceAPI)]
+	private[this] val usedNames = new HashMap[File, Set[String]]
 	private[this] val unreporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val reporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val binaryDeps = new HashMap[File, Set[File]]
@@ -125,6 +126,8 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		if (APIUtil.hasMacro(source)) macroSources += sourceFile
 		apis(sourceFile) = (HashAPI(source), APIUtil.minimize(source))
 	}
+	
+	def usedName(sourceFile: File, name: String) = add(usedNames, sourceFile, name)
 
 	def endSource(sourcePath: File): Unit =
 		assert(apis.contains(sourcePath))
@@ -144,8 +147,8 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		}
 	def getOrNil[A,B](m: collection.Map[A, Seq[B]], a: A): Seq[B] = m.get(a).toList.flatten
 	def addExternals(base: Analysis): Analysis = (base /: extSrcDeps) { case (a, (source, name, api)) => a.addExternalDep(source, name, api) }
-	def addUsedNames(base: Analysis): Analysis = (base /: apis) { case (a, (src, (_, api) ) ) =>
-	  (a /: api.usedNames) { case (a, name) => a.copy(relations = a.relations.addUsedName(src, name)) }
+	def addUsedNames(base: Analysis): Analysis = (base /: usedNames) { case (a, (src, names)) => 
+	  (a /: names) { case (a, name) => a.copy(relations = a.relations.addUsedName(src, name)) } 
 	}
 		
 	def addAll[A,B](base: Analysis, m: Map[A, Set[B]])( f: (Analysis, A, B) => Analysis): Analysis =

@@ -11,6 +11,7 @@ class TestCallback extends AnalysisCallback
 	val binaryDependencies = new ArrayBuffer[(File, String, File)]
 	val products = new ArrayBuffer[(File, File, String)]
 	val apis = new ArrayBuffer[(File, xsbti.api.SourceAPI)]
+	val usedNames = new ArrayBuffer[(File, String)]
 
 	def beginSource(source: File) { beganSources += source }
 
@@ -20,5 +21,6 @@ class TestCallback extends AnalysisCallback
 	def endSource(source: File) { endedSources += source }
 
 	def api(source: File, sourceAPI: xsbti.api.SourceAPI) { apis += ((source, sourceAPI)) }
+	def usedName(source: File, name: String) { usedNames += ((source, name)) }
 	def problem(category: String, pos: xsbti.Position, message: String, severity: xsbti.Severity, reported: Boolean) {}
 }

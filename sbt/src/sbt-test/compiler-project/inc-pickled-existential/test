@@ -1,0 +1,11 @@
+# Tests if existential types are pickled correctly so they
+# do not introduce unnecessary compile iterations
+
+# introduces first compile iteration
+> compile
+# this change is local to method and does not change api so introduces
+# only one additional compile iteration
+$ copy-file changes/B1.scala src/main/scala/B.scala
+# here we should have 2 iterations dumped
+> compile-and-dump-analysis
+$ must-mirror analysis-dump.expected target/analysis-dump.txt

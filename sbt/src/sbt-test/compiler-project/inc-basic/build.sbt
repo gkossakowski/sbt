@@ -14,6 +14,7 @@ TaskKey[Unit]("dump-analysis") <<= (compile in Compile, target, baseDirectory) m
     usedNames foreach { line =>
       w.write("\t"); w.write(line); w.newLine()
     }
+    w.write("Number of compilations: " + a.compilations.allCompilations.size); w.newLine()
   }
   //println(usedNames)
 }

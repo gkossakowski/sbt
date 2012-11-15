@@ -280,6 +280,7 @@ object DefaultShowAPI extends ShowBase with ShowBasicTypes with ShowValueParamet
 {
 	def apply(d: Definition) = ShowAPI.show(d)
 	def apply(d: Type) = ShowAPI.show(d)
+	def apply(s: SourceAPI) = ShowAPI.show(s)
 
 	implicit lazy val showVal: Show[Val] = Cyclic.showVal
 	implicit lazy val showVar: Show[Var] = Cyclic.showVar

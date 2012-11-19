@@ -12,10 +12,18 @@ object HashAPI
 {
 	type Hash = Int
 	def apply(a: SourceAPI): Hash =
-		(new HashAPI(false, true)).hashAPI(a)
+		(new HashAPI(false, true, true)).hashAPI(a)
 }
 
-final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean)
+/**
+ * Implements hashing of public API.
+ *
+ * @param includePrivate should private definitions be included in a hash sum
+ * @param includeParamNames should parameter names for methods be included in a hash sum
+ * @param includeDefintions when hashing a structure (e.g. of a class) should hashes of definitions (members)
+ *   be included in a hash sum.
+ */
+final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, includeDefintions: Boolean)
 {
 	import scala.collection.mutable
 	import MurmurHash._
@@ -93,7 +101,7 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean)
 			magicA = startMagicA
 			magicB = startMagicB
 			hashF(t)
-			(finalizeHash(hash), magicA, magicB)
+			(finalizeHash, magicA, magicB)
 		} unzip3;
 		hash = current
 		magicA = mA
@@ -107,6 +115,9 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean)
 		magicA = nextMagicA(magicA)
 		magicB = nextMagicB(magicB)
 	}
+
+	def finalizeHash: Hash = MurmurHash.finalizeHash(hash)
+
 	def hashModifiers(m: Modifiers) = extend(m.raw)
 
 	def hashAPI(s: SourceAPI): Hash =
@@ -114,7 +125,7 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean)
 		hash = startHash(0)
 		hashSymmetric(s.packages, hashPackage)
 		hashDefinitions(s.definitions, true)
-		finalizeHash(hash)
+		finalizeHash
 	}
 
 	def hashPackage(p: Package) = hashString(p.name)
@@ -327,8 +338,10 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean)
 	{
 		extend(StructureHash)
 		hashTypes(structure.parents)
-		hashDefinitions(structure.declared, false)
-		hashDefinitions(structure.inherited, false)
+		if (includeDefintions) {
+		  hashDefinitions(structure.declared, false)
+		  hashDefinitions(structure.inherited, false)
+		}
 	}
 	def hashParameters(parameters: Seq[TypeParameter], base: Type): Unit =
 	{

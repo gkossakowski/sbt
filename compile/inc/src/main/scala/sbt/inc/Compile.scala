@@ -9,6 +9,7 @@ import xsbti.compile.{DependencyChanges, Output, SingleOutput, MultipleOutput}
 import xsbti.{Position,Problem,Severity}
 import Logger.{m2o, problem}
 import java.io.File
+import xsbti.api.Definition
 
 object IncrementalCompile
 {
@@ -54,6 +55,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	
 	private[this] val apis = new HashMap[File, (Int, SourceAPI)]
 	private[this] val usedNames = new HashMap[File, Set[String]]
+	private[this] val publicNameHashes = new HashMap[File, scala.collection.immutable.Set[xsbti.api.NameHash]]
 	private[this] val unreporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val reporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val binaryDeps = new HashMap[File, Set[File]]
@@ -121,13 +123,38 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		classToSource.put(module, source)
 	}
 	
+	def nameHashes(source: SourceAPI): scala.collection.immutable.Set[xsbti.api.NameHash] = {
+	  val apiPublicDefs = publicDefs(source)
+		def hashDefinitions(defs: scala.collection.immutable.Set[Definition]): Int = {
+	      val hashAPI = new xsbt.api.HashAPI(false, true, false)
+		  hashAPI.hashDefinitions(defs.toSeq, false)
+		  hashAPI.finalizeHash
+		}
+		def localName(name: String): String = {
+		  val index = name.lastIndexOf('.') + 1
+		  name.substring(index)
+		}
+		val publicDefsHashes = apiPublicDefs.groupBy(x => localName(x.name())).mapValues(hashDefinitions)
+		publicDefsHashes.toSeq.map({case (name: String, hash: Int) => new xsbti.api.NameHash(name, hash) }).toSet
+	}
+
 	def api(sourceFile: File, source: SourceAPI) {
 		import xsbt.api.{APIUtil, HashAPI}
 		if (APIUtil.hasMacro(source)) macroSources += sourceFile
+		publicNameHashes(sourceFile) = nameHashes(source)
 		apis(sourceFile) = (HashAPI(source), APIUtil.minimize(source))
 	}
 	
 	def usedName(sourceFile: File, name: String) = add(usedNames, sourceFile, name)
+
+	def publicDefs(source: SourceAPI): scala.collection.immutable.Set[Definition] = {
+	  import scala.collection.immutable.Set
+	  def extractAllNestedDefs(deff: Definition): Set[Definition] = Set(deff) ++ (deff match {
+	    case cl: xsbti.api.ClassLike => cl.structure().declared().flatMap(extractAllNestedDefs).toSet
+	    case _ => Set.empty
+	  })
+	  source.definitions.flatMap(extractAllNestedDefs).toSet
+	}
 
 	def endSource(sourcePath: File): Unit =
 		assert(apis.contains(sourcePath))
@@ -141,7 +168,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			val hash = stamp match { case h: Hash => h.value; case _ => new Array[Byte](0) }
 			// TODO store this in Relations, rather than Source.
 			val hasMacro: Boolean = macroSources.contains(src)
-			val s = new xsbti.api.Source(compilation, hash, api._2, api._1, hasMacro)
+			val s = new xsbti.api.Source(compilation, hash, api._2, api._1, publicNameHashes(src).toArray, hasMacro)
 			val info = SourceInfos.makeInfo(getOrNil(reporteds, src), getOrNil(unreporteds, src))
 			a.addSource(src, s, stamp, sourceDeps.getOrElse(src, Nil: Iterable[File]), info)
 		}

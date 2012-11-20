@@ -1,3 +1,5 @@
+logLevel := Level.Debug
+
 compile in Compile <<= (compile in Compile, savedAnalysis) map { (a: sbt.inc.Analysis, buf: scala.collection.mutable.Buffer[sbt.inc.Analysis]) =>
   buf += a
   a

@@ -68,7 +68,21 @@ object Incremental
 
 		val modifiedAPIs = changes._1.toSet
 
-		new APIChanges(modifiedAPIs, changedNames)
+		def calculateModifiedNameHashes(xs: Set[xsbti.api.NameHash], ys: Set[xsbti.api.NameHash]): Set[String] = {
+		  // we have to map `NameHash` into pairs because `NameHash` does not implement hashCode and equals methods
+		  val xsPairs = xs.map(x => x.name -> x.hash)
+		  val ysPairs = ys.map(y => y.name -> y.hash)
+		  val differentPairs = (xsPairs union ysPairs) diff (xsPairs intersect ysPairs)
+		  differentPairs.map(_._1)
+		}
+
+		val modifiedNameHashes = (lastSources, oldApis, newApis).zipped collect {
+		  case (src, oldApi, newApi) if modifiedAPIs.contains(src) => src -> calculateModifiedNameHashes(oldApi.nameHashes.toSet, newApi.nameHashes.toSet)
+		}
+
+		log.debug("Names with modified hashes (per-source file):\n" + modifiedNameHashes.mkString("\n"))
+
+		new APIChanges(modifiedAPIs, modifiedNameHashes.toMap, changedNames)
 	}
 	def sameSource(a: Source, b: Source): Boolean = {
 		// Clients of a modified source file (ie, one that doesn't satisfy `shortcutSameSource`) containing macros must be recompiled.
@@ -105,7 +119,35 @@ object Incremental
 
 	def invalidateIncremental(previous: Relations, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
-		val dependsOnSrc = previous.usesInternalSrc _
+	    /**
+	     * Function that determines dependencies on sources (`to` argument) from other files (returned as result).
+	     *
+	     * It takes into account both information from relations (`previous`) and APIChanges (`changes`) so it only
+	     * considers one source file to be dependent on another if names of which hashes changed in `to` appear as
+	     * used names in `from` file.
+	     *
+	     * If there's no information about modified names for `to` argument we consider this to be a case where
+	     * dependency should be preserved because there's not sufficient information that justified dropping it.
+	     */
+		val dependsOnSrc = (to: java.io.File) => {
+			changes.modifiedNames.get(to) match {
+				case None =>
+					val dependent = previous.usesInternalSrc(to)
+					log.debug("Information about modified names in %s was not available so all dependencies are considered: %s".format(to, dependent))
+					dependent
+				case Some(modifiedNames) =>
+					previous.usesInternalSrc(to).filter { from: java.io.File =>
+						val modifiedAndUsedNames = modifiedNames intersect previous.usedNames(from)
+						if (modifiedAndUsedNames.isEmpty) {
+							log.debug("Information about modified names in %s was available but none of the modified names appears in %s. This dependency is not being considered for invalidation.".format(to, from))
+							false
+						} else {
+							log.debug("The following modified names in %s cause invalidation of %s: %s".format(to, from, modifiedAndUsedNames))
+							true
+						}
+					}
+			}
+		}
 		val propagated =
 			if(transitive)
 				transitiveDependencies(dependsOnSrc, changes.modified, log)

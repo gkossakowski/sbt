@@ -34,5 +34,5 @@ TaskKey[Unit]("check-names") <<= (savedAnalysis, baseDirectory) map { (ab: scala
 }
 
 TaskKey[Unit]("check-number-of-compiler-iterations") <<= (savedAnalysis) map { ab: scala.collection.mutable.Buffer[sbt.inc.Analysis] =>
-  assert(ab.last.compilations.allCompilations.size == 3, "ab.last.compilations.allCompilations.size = %d (expected %d)".format(ab.last.compilations.allCompilations.size, 3))
+  assert(ab.last.compilations.allCompilations.size == 2, "ab.last.compilations.allCompilations.size = %d (expected %d)".format(ab.last.compilations.allCompilations.size, 2))
 }

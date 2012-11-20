@@ -22,7 +22,7 @@ TaskKey[Unit]("check-names") <<= (savedAnalysis, baseDirectory) map { (ab: scala
     assert(a1.apis.internal.keySet.contains(file))
     val nms1 = a1.apis.internalAPI(file).nameHashes.toSet
     val nms2 = a2.apis.internalAPI(file).nameHashes.toSet
-    assert(sameNameHashes(nms1, nms2), "hashes are not the same in " + file)
+    assert(sameNameHashes(nms1, nms2), "hashes are not the same in " + file + " nms1 = " + nms1 + " nms2 = " + nms2)
   }
   // test src/main/scala/A.scala, name should be equal except for one corresponding to "bar"
   {
@@ -30,7 +30,7 @@ TaskKey[Unit]("check-names") <<= (savedAnalysis, baseDirectory) map { (ab: scala
     assert(a1.apis.internal.keySet.contains(file))
     val nms1 = a1.apis.internalAPI(file).nameHashes.toSet
     val nms2 = a2.apis.internalAPI(file).nameHashes.toSet
-    assert(sameNameHashes(nms1.filterNot(_.name == "bar"), nms2.filterNot(_.name == "bar")), "hashes are not the same in " + file)
+    assert(sameNameHashes(nms1.filterNot(_.name == "bar"), nms2.filterNot(_.name == "bar")), "hashes are not the same in " + file + " nms1 = " + nms1 + " nms2 = " + nms2)
     assert(nms2.exists(_.name == "bar"), """hash sum for "bar" does not exist""")
   }
 }

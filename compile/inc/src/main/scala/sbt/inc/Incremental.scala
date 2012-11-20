@@ -14,7 +14,7 @@ object Incremental
 {
 	def compile(sources: Set[File], entry: String => Option[File], previous: Analysis, current: ReadStamps, forEntry: File => Option[Analysis], doCompile: (Set[File], DependencyChanges) => Analysis, log: Logger)(implicit equivS: Equiv[Stamp]): (Boolean, Analysis) =
 	{
-		val initialChanges = changedInitial(entry, sources, previous, current, forEntry)
+		val initialChanges = changedInitial(entry, sources, previous, current, forEntry, log)
 		val binaryChanges = new DependencyChanges {
 			val modifiedBinaries = initialChanges.binaryDeps.toArray
 			val modifiedClasses = initialChanges.external.modified.toArray
@@ -41,7 +41,7 @@ object Incremental
 			debug("********* Fresh: \n" + fresh.relations + "\n*********")
 			val merged = pruned ++ fresh//.copy(relations = pruned.relations ++ fresh.relations, apis = pruned.apis ++ fresh.apis)
 			debug("********* Merged: \n" + merged.relations + "\n*********")
-			val incChanges = changedIncremental(invalidated, previous.apis.internalAPI _, merged.apis.internalAPI _)
+			val incChanges = changedIncremental(invalidated, previous.apis.internalAPI _, merged.apis.internalAPI _, log)
 			debug("Changes:\n" + incChanges)
 			val incInv = invalidateIncremental(merged.relations, incChanges, invalidated, cycleNum >= 2, log)
 			cycle(incInv, emptyChanges, merged, doCompile, cycleNum+1, log)
@@ -58,7 +58,7 @@ object Incremental
 	* providing the API before and after the last step.  The functions should return
 	* an empty API if the file did not/does not exist.
 	*/
-	def changedIncremental[T](lastSources: collection.Set[T], oldAPI: T => Source, newAPI: T => Source): APIChanges[T] =
+	def changedIncremental[T](lastSources: collection.Set[T], oldAPI: T => Source, newAPI: T => Source, log: Logger): APIChanges[T] =
 	{
 		val oldApis = lastSources.toSeq map oldAPI
 		val newApis = lastSources.toSeq map newAPI
@@ -81,15 +81,15 @@ object Incremental
 		case (co1, co2) => co1.sourceDirectory == co2.sourceDirectory && co1.outputDirectory == co2.outputDirectory
   }
 
-	def changedInitial(entry: String => Option[File], sources: Set[File], previousAnalysis: Analysis, current: ReadStamps, forEntry: File => Option[Analysis])(implicit equivS: Equiv[Stamp]): InitialChanges =
+	def changedInitial(entry: String => Option[File], sources: Set[File], previousAnalysis: Analysis, current: ReadStamps, forEntry: File => Option[Analysis], log: Logger)(implicit equivS: Equiv[Stamp]): InitialChanges =
 	{
 		val previous = previousAnalysis.stamps
 		val previousAPIs = previousAnalysis.apis
-		
+
 		val srcChanges = changes(previous.allInternalSources.toSet, sources,  f => !equivS.equiv( previous.internalSource(f), current.internalSource(f) ) )
 		val removedProducts = previous.allProducts.filter( p => !equivS.equiv( previous.product(p), current.product(p) ) ).toSet
 		val binaryDepChanges = previous.allBinaries.filter( externalBinaryModified(entry, forEntry, previous, current)).toSet
-		val extChanges = changedIncremental(previousAPIs.allExternals, previousAPIs.externalAPI _, currentExternalAPI(entry, forEntry))
+		val extChanges = changedIncremental(previousAPIs.allExternals, previousAPIs.externalAPI _, currentExternalAPI(entry, forEntry), log)
 
 		InitialChanges(srcChanges, removedProducts, binaryDepChanges, extChanges )
 	}

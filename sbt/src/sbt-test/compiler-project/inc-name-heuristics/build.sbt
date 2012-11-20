@@ -32,3 +32,7 @@ TaskKey[Unit]("check-names") <<= (savedAnalysis, baseDirectory) map { (ab: scala
     assert(nms2.exists(_.name == "bar"), """hash sum for "bar" does not exist""")
   }
 }
+
+TaskKey[Unit]("check-number-of-compiler-iterations") <<= (savedAnalysis) map { ab: scala.collection.mutable.Buffer[sbt.inc.Analysis] =>
+  assert(ab.last.compilations.allCompilations.size == 3, "ab.last.compilations.allCompilations.size = %d (expected %d)".format(ab.last.compilations.allCompilations.size, 3))
+}

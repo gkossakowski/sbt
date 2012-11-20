@@ -147,7 +147,21 @@ object Incremental
 
 		val modifiedAPIs = changes._1.toSet
 
-		new APIChanges(modifiedAPIs, changedNames)
+		def calculateModifiedNameHashes(xs: Set[xsbti.api.NameHash], ys: Set[xsbti.api.NameHash]): Set[String] = {
+		  // we have to map `NameHash` into pairs because `NameHash` does not implement hashCode and equals methods
+		  val xsPairs = xs.map(x => x.name -> x.hash)
+		  val ysPairs = ys.map(y => y.name -> y.hash)
+		  val differentPairs = (xsPairs union ysPairs) diff (xsPairs intersect ysPairs)
+		  differentPairs.map(_._1)
+		}
+
+		val modifiedNameHashes = (lastSources, oldApis, newApis).zipped collect {
+		  case (src, oldApi, newApi) if modifiedAPIs.contains(src) => src -> calculateModifiedNameHashes(oldApi.nameHashes.toSet, newApi.nameHashes.toSet)
+		}
+
+		log.debug("Names with modified hashes (per-source file):\n" + modifiedNameHashes.mkString("\n"))
+
+		new APIChanges(modifiedAPIs, modifiedNameHashes.toMap, changedNames)
 	}
 	def sameSource(a: Source, b: Source): Boolean = {
 		// Clients of a modified source file (ie, one that doesn't satisfy `shortcutSameSource`) containing macros must be recompiled.
@@ -185,12 +199,18 @@ object Incremental
 
 	def invalidateIncremental(previous: Relations, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
-		val dependsOnSrc = previous.usesInternalSrc _
+		val memberRefReversed: File => Set[File] = previous.memberRef.internal.reverseMap
+		val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
+		val dependsOnSrc: File => Set[File] = { to =>
+			val byInheritance = previous.inheritance.internal.reverse(to)
+			val byMemberRef = memberRefDepsRevesredAndFiltered(to)
+			byInheritance ++ byMemberRef
+		}
 		val propagated =
 			if(transitive)
 				transitiveDependencies(dependsOnSrc, changes.modified, log)
 			else
-				invalidateIntermediate(previous, changes.modified, log)
+				invalidateIntermediate(previous, changes.modified, changes.modifiedNames, log)
 
 		val dups = invalidateDuplicates(previous)
 		if(dups.nonEmpty)
@@ -258,10 +278,12 @@ object Incremental
 		transitiveInheritance ++ directA ++ directB
 	}
 	/** Intermediate invalidation step: steps after the initial invalidation, but before the final transitive invalidation. */
-	def invalidateIntermediate(relations: Relations, modified: Set[File], log: Logger): Set[File] =
+	def invalidateIntermediate(relations: Relations, modified: Set[File], modifiedNames: Map[File, Set[String]], log: Logger): Set[File] =
 	{
 		def reverse(r: Relations.SourceDependencies) = r.internal.reverse _
-		invalidateSources(reverse(relations.memberRef), reverse(relations.inheritance), modified, log)
+		val memberRefReversed = reverse(relations.memberRef)
+		val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(relations.names, memberRefReversed, modifiedNames, log)
+		invalidateSources(memberRefDepsRevesredAndFiltered, reverse(relations.inheritance), modified, log)
 	}
 	/** Invalidates inheritance dependencies, transitively.  Then, invalidates direct dependencies.  Finally, excludes initial dependencies not
 	* included in a cycle with newly invalidated sources. */

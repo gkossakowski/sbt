@@ -1,6 +1,7 @@
 import sbt._
 import Keys._
 
+// we need this build definition to introduce savedAnalysis key (declaring vals is not possible in build.sbt)
 object MyBuild extends Build {
 
   /** 

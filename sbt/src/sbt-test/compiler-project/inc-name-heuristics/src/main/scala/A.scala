@@ -1,5 +1,5 @@
 package test
 
-class A {
+abstract class A {
   def foo(x: String): String = x
 }

@@ -2,4 +2,4 @@
 $ copy-file changes/A1.scala src/main/scala/A.scala
 > compile
 > check-names
-> check-number-of-compiler-iterations
+> check-number-of-compiler-iterations 2

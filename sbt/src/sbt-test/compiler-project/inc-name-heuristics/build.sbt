@@ -42,3 +42,11 @@ InputKey[Unit]("check-number-of-compiler-iterations") <<= inputTask { (argTask: 
     assert(a.compilations.allCompilations.size == expectedIterationsNumber, "a.compilations.allCompilations.size = %d (expected %d)".format(a.compilations.allCompilations.size, expectedIterationsNumber))
   }
 }
+
+// checks if C.scala has been recompiled after or at the same time as A.scala
+// this invariant should be preserved because class C inherits from A
+TaskKey[Unit]("verify-compilation-time") <<= (compile in Compile, baseDirectory) map { (a: sbt.inc.Analysis, base: java.io.File) =>
+  val A_compilationTime = a.apis.internalAPI(base / "src/main/scala/A.scala").compilation.startTime
+  val C_compilationTime = a.apis.internalAPI(base / "src/main/scala/C.scala").compilation.startTime
+  assert(C_compilationTime >= A_compilationTime)
+}

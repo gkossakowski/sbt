@@ -23,7 +23,7 @@ object IncrementalCompile
 	def doCompile(compile: (Set[File], DependencyChanges, xsbti.AnalysisCallback) => Unit, internalMap: File => Option[File], externalAPI: (File, String) => Option[Source], current: ReadStamps, output: Output) = (srcs: Set[File], changes: DependencyChanges) => {
 		val callback = new AnalysisCallback(internalMap, externalAPI, current, output)
 		compile(srcs, changes, callback)
-		callback.get 
+		callback.get
 	}
 	def getExternalAPI(entry: String => Option[File], forEntry: File => Option[Analysis]): (File, String) => Option[Source] =
 	 (file: File,className: String) =>
@@ -50,9 +50,9 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	}
 
 	override def toString = ( List("APIs", "Binary deps", "Products", "Source deps") zip List(apis, binaryDeps, classes, sourceDeps)).map { case (label, map) => label + "\n\t" + map.mkString("\n\t") }.mkString("\n")
-	
+
 	import collection.mutable.{HashMap, HashSet, ListBuffer, Map, Set}
-	
+
 	private[this] val apis = new HashMap[File, (Int, SourceAPI)]
 	private[this] val usedNames = new HashMap[File, Set[String]]
 	private[this] val publicNameHashes = new HashMap[File, scala.collection.immutable.Set[xsbti.api.NameHash]]
@@ -116,13 +116,13 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 				// dependency is some other binary on the classpath
 				externalBinaryDependency(classFile, name, source)
 		}
-		
+
 	def generatedClass(source: File, module: File, name: String) =
 	{
 		add(classes, source, (module, name))
 		classToSource.put(module, source)
 	}
-	
+
 	def nameHashes(source: SourceAPI): scala.collection.immutable.Set[xsbti.api.NameHash] = {
 	  val apiPublicDefs = publicDefs(source)
 		def hashDefinitions(defs: scala.collection.immutable.Set[Definition]): Int = {
@@ -144,7 +144,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		publicNameHashes(sourceFile) = nameHashes(source)
 		apis(sourceFile) = (HashAPI(source), APIUtil.minimize(source))
 	}
-	
+
 	def usedName(sourceFile: File, name: String) = add(usedNames, sourceFile, name)
 
 	def publicDefs(source: SourceAPI): scala.collection.immutable.Set[Definition] = {
@@ -158,7 +158,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 
 	def endSource(sourcePath: File): Unit =
 		assert(apis.contains(sourcePath))
-	
+
 	def get: Analysis = addCompilation( addUsedNames( addExternals( addBinaries( addProducts( addSources(Analysis.Empty) ) ) ) ) )
 	def addProducts(base: Analysis): Analysis = addAll(base, classes) { case (a, src, (prod, name)) => a.addProduct(src, prod, current product prod, name ) }
 	def addBinaries(base: Analysis): Analysis = addAll(base, binaryDeps)( (a, src, bin) => a.addBinaryDep(src, bin, binaryClassName(bin), current binary bin) )
@@ -178,7 +178,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	  (a /: names) { case (a, name) => a.copy(relations = a.relations.addUsedName(src, name)) } 
 	}
 	def addCompilation(base: Analysis): Analysis = base.copy(compilations = base.compilations.add(compilation))
-		
+
 	def addAll[A,B](base: Analysis, m: Map[A, Set[B]])( f: (Analysis, A, B) => Analysis): Analysis =
 		(base /: m) { case (outer, (a, bs)) =>
 			(outer /: bs) { (inner, b) =>

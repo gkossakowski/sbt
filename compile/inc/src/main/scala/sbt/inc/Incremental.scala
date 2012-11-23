@@ -51,7 +51,7 @@ object Incremental
 		val modifiedClasses = new Array[String](0)
 		def isEmpty = true
 	}
-	
+
 
 	/**
 	* Accepts the sources that were recompiled during the last step and functions
@@ -184,7 +184,7 @@ object Incremental
 
 	/** Returns the transitive source dependencies of `initial`, excluding the files in `initial` in most cases.
 	* In three-stage incremental compilation, the `initial` files are the sources from step 2 that had API changes.
-	* Because strongly connected components (cycles) are included in step 2, the files with API changes shouldn't 
+	* Because strongly connected components (cycles) are included in step 2, the files with API changes shouldn't
 	* need to be compiled in step 3 if their dependencies haven't changed.  If there are new cycles introduced after
 	* step 2, these can require step 2 sources to be included in step 3 recompilation.
 	*/

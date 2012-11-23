@@ -118,7 +118,7 @@ abstract class Compat
 	import global._
 	val LocalChild = global.tpnme.LOCAL_CHILD
 	val Nullary = global.NullaryMethodType
-	val ScalaObjectClass = definitions.ScalaObjectClass	
+	val ScalaObjectClass = definitions.ScalaObjectClass
 
 	private[this] final class MiscCompat
 	{

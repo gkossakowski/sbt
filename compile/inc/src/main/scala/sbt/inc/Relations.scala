@@ -11,7 +11,7 @@ trait Relations
 {
 	/** All sources _with at least one product_ . */
 	def allSources: collection.Set[File]
-	
+
 	def allProducts: collection.Set[File]
 	def allBinaryDeps: collection.Set[File]
 	def allInternalSrcDeps: collection.Set[File]
@@ -19,36 +19,36 @@ trait Relations
 
 	def classNames(src: File): Set[String]
 	def definesClass(name: String): Set[File]
-	
+
 	def products(src: File): Set[File]
 	def produced(prod: File): Set[File]
-	
+
 	def binaryDeps(src: File): Set[File]
 	def usesBinary(dep: File): Set[File]
-	
+
 	def internalSrcDeps(src: File): Set[File]
 	def usesInternalSrc(dep: File): Set[File]
-	
+
 	def externalDeps(src: File): Set[String]
 	def usesExternal(dep: String): Set[File]
-	
+
 	def usedNames(src: File): Set[String]
-	
+
 	def addProduct(src: File, prod: File, name: String): Relations
 	def addExternalDep(src: File, dependsOn: String): Relations
 	def addInternalSrcDeps(src: File, dependsOn: Iterable[File]): Relations
 	def addBinaryDep(src: File, dependsOn: File): Relations
 	def addUsedName(src: File, name: String): Relations
-	
+
 	def ++ (o: Relations): Relations
 	def -- (sources: Iterable[File]): Relations
-	
+
 	def srcProd: Relation[File, File]
 	def binaryDep: Relation[File, File]
 	def internalSrcDep: Relation[File, File]
 	def externalDep: Relation[File, String]
 	def classes: Relation[File, String]
-	/** 
+	/**
 	 * Relation between source files and _unqualified_ term and type names used in given source file.
 	 */
 	def names: Relation[File, String]
@@ -92,19 +92,19 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 
 	def classNames(src: File): Set[String] = classes.forward(src)
 	def definesClass(name: String): Set[File] = classes.reverse(name)
-	
+
 	def products(src: File): Set[File] = srcProd.forward(src)
 	def produced(prod: File): Set[File] = srcProd.reverse(prod)
-	
+
 	def binaryDeps(src: File): Set[File] = binaryDep.forward(src)
 	def usesBinary(dep: File): Set[File] = binaryDep.reverse(dep)
-	
+
 	def internalSrcDeps(src: File): Set[File] = internalSrcDep.forward(src)
 	def usesInternalSrc(dep: File): Set[File] = internalSrcDep.reverse(dep)
 
 	def externalDeps(src: File): Set[String] = externalDep.forward(src)
 	def usesExternal(dep: String): Set[File] = externalDep.reverse(dep)
-	
+
 	def usedNames(src: File): Set[String] = names.forward(src)
 
 	def addProduct(src: File, prod: File, name: String): Relations =
@@ -116,12 +116,13 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 	def addInternalSrcDeps(src: File, dependsOn: Iterable[File]): Relations =
 		new MRelations( srcProd, binaryDep, internalSrcDep + (src, dependsOn ), externalDep, classes, names )
 
+
 	def addBinaryDep(src: File, dependsOn: File): Relations =
 		new MRelations( srcProd, binaryDep + (src, dependsOn), internalSrcDep, externalDep, classes, names )
-	
+
 	def addUsedName(src: File, name: String): Relations =
 	    new MRelations( srcProd, binaryDep, internalSrcDep, externalDep, classes, names + (src, name) )
-	
+
 	def ++ (o: Relations): Relations =
 		new MRelations(srcProd ++ o.srcProd, binaryDep ++ o.binaryDep, internalSrcDep ++ o.internalSrcDep, externalDep ++ o.externalDep, classes ++ o.classes, names ++ o.names)
 	def -- (sources: Iterable[File]) =

@@ -20,7 +20,7 @@ trait Analysis
 	def -- (sources: Iterable[File]): Analysis
 	def copy(stamps: Stamps = stamps, apis: APIs = apis, relations: Relations = relations, infos: SourceInfos = infos,
 	    compilations: Compilations = compilations): Analysis
-	
+
 	def addSource(src: File, api: Source, stamp: Stamp, internalDeps: Iterable[File], info: SourceInfo): Analysis
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis
 	def addExternalDep(src: File, dep: String, api: Source): Analysis

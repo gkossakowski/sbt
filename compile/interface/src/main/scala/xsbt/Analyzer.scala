@@ -33,9 +33,14 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 				// build dependencies structure
 				val sourceFile = unit.source.file.file
 				callback.beginSource(sourceFile)
-				for(on <- unit.depends)
-				{
-					def binaryDependency(file: File, className: String) = callback.binaryDependency(file, className, sourceFile)
+				/**
+				 * Handles dependency on given symbol by trying to figure out if represents a term
+				 * that is coming from either source code (not necessarily compiled in this compilation
+				 * run) or from class file and calls respective callback method.
+				 */
+				def handleDependency(on: Symbol): Unit = {
+					def binaryDependency(file: File, className: String) =
+						callback.binaryDependency(file, className, sourceFile)
 					val onSource = on.sourceFile
 					if(onSource == null)
 					{
@@ -55,6 +60,8 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 					else
 						callback.sourceDependency(onSource.file, sourceFile)
 				}
+				for(on <- unit.depends)
+					handleDependency(on)
 
 				// build list of generated classes
 				for(iclass <- unit.icode)

@@ -128,9 +128,11 @@ object Incremental
 	     *
 	     * If there's no information about modified names for `to` argument we consider this to be a case where
 	     * dependency should be preserved because there's not sufficient information that justified dropping it.
+	     *
+	     * Dependencies introduced by inheritance are kept as-is without any further processing.
 	     */
 		val dependsOnSrc = (to: java.io.File) => {
-			changes.modifiedNames.get(to) match {
+			val memberRefDependencies = changes.modifiedNames.get(to) match {
 				case None =>
 					val dependent = previous.usesInternalSrc(to)
 					log.debug("Information about modified names in %s was not available so all dependencies are considered: %s".format(to, dependent))
@@ -147,6 +149,11 @@ object Incremental
 						}
 					}
 			}
+			val inheritanceDependencies = previous.usesInternalSrcByInheritance(to)
+			if (!inheritanceDependencies.isEmpty)
+				log.debug("The following inheritance-based dependencies pointing at %s are considered for invalidation:\n"
+					+ inheritanceDependencies.mkString("\n"))
+			memberRefDependencies ++ inheritanceDependencies
 		}
 		val propagated =
 			if(transitive)

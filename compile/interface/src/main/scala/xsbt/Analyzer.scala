@@ -38,9 +38,9 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 				 * that is coming from either source code (not necessarily compiled in this compilation
 				 * run) or from class file and calls respective callback method.
 				 */
-				def handleDependency(on: Symbol): Unit = {
+				def handleDependency(on: Symbol, depType: xsbti.AnalysisCallback.DependencyType): Unit = {
 					def binaryDependency(file: File, className: String) =
-						callback.binaryDependency(file, className, sourceFile)
+						callback.binaryDependency(file, className, sourceFile, depType)
 					val onSource = on.sourceFile
 					if(onSource == null)
 					{
@@ -58,10 +58,18 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 						}
 					}
 					else
-						callback.sourceDependency(onSource.file, sourceFile)
+						callback.sourceDependency(onSource.file, sourceFile, depType)
 				}
 				for(on <- unit.depends)
-					handleDependency(on)
+					handleDependency(on, xsbti.AnalysisCallback.DependencyType.MEMBER_REF)
+
+				unit.body foreach {
+					case Template(parents, _, _) =>
+						parents foreach { parent =>
+							handleDependency(parent.symbol, xsbti.AnalysisCallback.DependencyType.INHERITANCE)
+						}
+					case _ => ()
+				}
 
 				// build list of generated classes
 				for(iclass <- unit.icode)

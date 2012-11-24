@@ -50,3 +50,9 @@ TaskKey[Unit]("verify-compilation-time") <<= (compile in Compile, baseDirectory)
   val D_compilationTime = a.apis.internalAPI(base / "src/main/scala/D.scala").compilation.startTime
   assert(D_compilationTime >= C_compilationTime)
 }
+
+// checks if D.scala depends on C.scala
+TaskKey[Unit]("verify-dependencies") <<= (compile in Compile, baseDirectory) map { (a: sbt.inc.Analysis, base: java.io.File) =>
+  val D_dependencies = a.relations.internalSrcDepsByInheritance(base / "src/main/scala/D.scala")
+  assert(D_dependencies == Set(base / "src/main/scala/C.scala"))
+}

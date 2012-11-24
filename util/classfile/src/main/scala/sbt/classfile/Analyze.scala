@@ -47,15 +47,18 @@ private[sbt] object Analyze
 				{
 					for (url <- Option(loader.getResource(tpe.replace('.', '/') + ClassExt)); file <- IO.urlAsFile(url))
 					{
+						import xsbti.AnalysisCallback.DependencyType
 						if(url.getProtocol == "jar")
-							analysis.binaryDependency(file, tpe, source)
+							analysis.binaryDependency(file, tpe, source, DependencyType.MEMBER_REF)
 						else
 						{
 							assume(url.getProtocol == "file")
 							productToSource.get(file) match
 							{
-								case Some(dependsOn) => analysis.sourceDependency(dependsOn, source)
-								case None => analysis.binaryDependency(file, tpe, source)
+								case Some(dependsOn) =>
+									analysis.sourceDependency(dependsOn, source, DependencyType.MEMBER_REF)
+								case None =>
+									analysis.binaryDependency(file, tpe, source, DependencyType.MEMBER_REF)
 							}
 						}
 					}

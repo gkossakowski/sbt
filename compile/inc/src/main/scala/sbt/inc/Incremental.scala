@@ -151,8 +151,8 @@ object Incremental
 			}
 			val inheritanceDependencies = previous.usesInternalSrcByInheritance(to)
 			if (!inheritanceDependencies.isEmpty)
-				log.debug("The following inheritance-based dependencies pointing at %s are considered for invalidation:\n"
-					+ inheritanceDependencies.mkString("\n"))
+				log.debug("The following inheritance-based dependencies pointing at %s are considered for invalidation:\n%s".
+				    format(to, inheritanceDependencies.mkString("\n")))
 			memberRefDependencies ++ inheritanceDependencies
 		}
 		val propagated =

@@ -96,6 +96,9 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 
 	private[this] final val classSeparator = '.'
 	private[this] def classFile(sym: Symbol): Option[(AbstractFile, String, Boolean)] =
+	  // packages can never have corresponding class files, this test does not
+	  // catch package objects (that do not have this flag set)
+	  if (sym hasFlag scala.tools.nsc.symtab.Flags.PACKAGE) None else
 	{
 		import scala.tools.nsc.symtab.Flags
 		val name = flatname(sym, classSeparator) + moduleSuffix(sym)

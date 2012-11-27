@@ -1,0 +1,6 @@
+# Tests for bug when sbt would introduce dependency on non-existing
+# class files corresponding to packages
+
+# introduces first compile iteration
+> compile
+> verify-binary-deps

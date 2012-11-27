@@ -156,12 +156,17 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	def usedName(sourceFile: File, name: String) = add(usedNames, sourceFile, name)
 
 	def publicDefs(source: SourceAPI): scala.collection.immutable.Set[Definition] = {
-	  import scala.collection.immutable.Set
-	  def extractAllNestedDefs(deff: Definition): Set[Definition] = Set(deff) ++ (deff match {
-	    case cl: xsbti.api.ClassLike => cl.structure().declared().flatMap(extractAllNestedDefs).toSet
-	    case _ => Set.empty
-	  })
-	  source.definitions.flatMap(extractAllNestedDefs).toSet
+		val defs = scala.collection.mutable.Set[Definition]()
+		def extractAllNestedDefs(deff: Definition): Unit = if (!defs.contains(deff)) {
+			defs += deff
+			deff match {
+				case cl: xsbti.api.ClassLike =>
+					cl.structure().declared().foreach(extractAllNestedDefs)
+				case _ => ()
+			}
+		}
+		source.definitions.foreach(extractAllNestedDefs)
+		defs.toSet
 	}
 
 	def endSource(sourcePath: File): Unit =

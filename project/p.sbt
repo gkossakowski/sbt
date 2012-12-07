@@ -8,3 +8,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "0.7.0-M1")
 resolvers += "jgit-repo" at "http://download.eclipse.org/jgit/maven"
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.5.0")
+
+// build that includes https://github.com/typesafehub/sbteclipse/pull/141 is needed
+// to generate correct Eclipse project files for xsbt projects
+addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "2.1.1-SNAPSHOT")

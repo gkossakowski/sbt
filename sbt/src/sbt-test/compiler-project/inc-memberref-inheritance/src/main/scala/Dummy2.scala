@@ -1,0 +1,1 @@
+// dummy file that disables sbt's heuristic of recompiling everything if number of invalidated sources exceeds 50% of all sources

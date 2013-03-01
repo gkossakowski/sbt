@@ -6,7 +6,6 @@ package xsbt
 import scala.tools.nsc.{io, plugins, symtab, Global, Phase}
 import io.{AbstractFile, PlainFile, ZipArchive}
 import plugins.{Plugin, PluginComponent}
-import symtab.Flags
 import scala.collection.mutable.{HashMap, HashSet, Map, Set}
 
 import java.io.File
@@ -17,7 +16,7 @@ object Analyzer
 {
 	def name = "xsbt-analyzer"
 }
-final class Analyzer(val global: CallbackGlobal) extends Compat
+final class Analyzer(val global: CallbackGlobal) extends LocateClassFile
 {
 	import global._
 
@@ -79,39 +78,4 @@ final class Analyzer(val global: CallbackGlobal) extends Compat
 		}
 	}
 
-	private[this] final val classSeparator = '.'
-	private[this] def classFile(sym: Symbol): Option[(AbstractFile, String, Boolean)] =
-	// package can never have a corresponding class file; this test does not
-	// catch package objects (that do not have this flag set)
-	if (sym hasFlag scala.tools.nsc.symtab.Flags.PACKAGE) None else
-	{
-		import scala.tools.nsc.symtab.Flags
-		val name = flatname(sym, classSeparator) + moduleSuffix(sym)
-		findClass(name).map { case (file,inOut) => (file, name,inOut) } orElse {
-			if(isTopLevelModule(sym))
-			{
-				val linked = sym.companionClass
-				if(linked == NoSymbol)
-					None
-				else
-					classFile(linked)
-			}
-			else
-				None
-		}
-	}
-	// doesn't seem to be in 2.7.7, so copied from GenJVM to here
-	private def moduleSuffix(sym: Symbol) =
-		if (sym.hasFlag(Flags.MODULE) && !sym.isMethod && !sym.isImplClass && !sym.hasFlag(Flags.JAVA)) "$" else "";
-	private def flatname(s: Symbol, separator: Char) =
-		atPhase(currentRun.flattenPhase.next) { s fullName separator }
-
-	private def isTopLevelModule(sym: Symbol): Boolean =
-		atPhase (currentRun.picklerPhase.next) {
-			sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass
-		}
-	private def className(s: Symbol, sep: Char, dollarRequired: Boolean): String =
-		flatname(s, sep) + (if(dollarRequired) "$" else "")
-	private def fileForClass(outputDirectory: File, s: Symbol, separatorRequired: Boolean): File =
-		new File(outputDirectory, className(s, File.separatorChar, separatorRequired) + ".class")
 }

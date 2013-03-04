@@ -23,7 +23,7 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile
 	def newPhase(prev: Phase): Phase = new AnalyzerPhase(prev)
 	private class AnalyzerPhase(prev: Phase) extends Phase(prev)
 	{
-		override def description = "Extracts dependency information, finds concrete instances of provided superclasses, and application entry points."
+		override def description = "Finds concrete instances of provided superclasses, and application entry points."
 		def name = Analyzer.name
 		def run
 		{
@@ -32,28 +32,6 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile
 				// build dependencies structure
 				val sourceFile = unit.source.file.file
 				callback.beginSource(sourceFile)
-				for(on <- unit.depends)
-				{
-					def binaryDependency(file: File, className: String) = callback.binaryDependency(file, className, sourceFile)
-					val onSource = on.sourceFile
-					if(onSource == null)
-					{
-						classFile(on) match
-						{
-							case Some((f,className,inOutDir)) =>
-								if(inOutDir && on.isJavaDefined) registerTopLevelSym(on)
-								f match
-								{
-									case ze: ZipArchive#Entry => for(zip <- ze.underlyingSource; zipFile <- Option(zip.file) ) binaryDependency(zipFile, className)
-									case pf: PlainFile => binaryDependency(pf.file, className)
-									case _ => ()
-								}
-							case None => ()
-						}
-					}
-					else
-						callback.sourceDependency(onSource.file, sourceFile)
-				}
 
 				// build list of generated classes
 				for(iclass <- unit.icode)
@@ -77,5 +55,4 @@ final class Analyzer(val global: CallbackGlobal) extends LocateClassFile
 			}
 		}
 	}
-
 }

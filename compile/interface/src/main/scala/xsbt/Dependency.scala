@@ -33,7 +33,8 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				// build dependencies structure
 				val sourceFile = unit.source.file.file
 				callback.beginSource(sourceFile)
-				for(on <- unit.depends)
+				val dependencies = extractDependencies(unit)
+				for(on <- dependencies)
 				{
 					def binaryDependency(file: File, className: String) = callback.binaryDependency(file, className, sourceFile)
 					val onSource = on.sourceFile
@@ -58,6 +59,51 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				callback.endSource(sourceFile)
 			}
 		}
+	}
+
+	def extractDependencies(unit: CompilationUnit): collection.immutable.Set[Symbol] = {
+		class ExtractDependenciesTraverser extends Traverser {
+			val depBuf = collection.mutable.ArrayBuffer.empty[Symbol]
+			override def traverse(tree: Tree): Unit = {
+				tree match {
+					case Import(expr, selectors) =>
+						selectors.foreach {
+							case ImportSelector(nme.WILDCARD, _, null, _) =>
+						        // in case of wildcard import we do not rely on any particular name being defined
+						        // on `expr`; all symbols that are being used will get caught through selections
+							case ImportSelector(name: Name, _, _, _) =>
+							  def lookupImported(name: Name) = expr.symbol.info.member(name)
+							  // importing a name means importing both a term and a type (if they exist)
+							  depBuf += lookupImported(name.toTermName)
+							  depBuf += lookupImported(name.toTypeName)
+					    }
+					case select: Select =>
+						depBuf += select.symbol
+					/*
+					 * Idents are used in number of situations:
+					 *  - to refer to local variable
+					 *  - to refer to a top-level package (other packages are nested selections)
+					 *  - to refer to a term defined in the same package as an enclosing class;
+					 *    this looks fishy, see this thread:
+					 *    https://groups.google.com/d/topic/scala-internals/Ms9WUAtokLo/discussion
+					 */
+					case ident: Ident =>
+					    depBuf += ident.symbol
+					case typeTree: TypeTree =>
+						depBuf += typeTree.symbol
+					case other => ()
+				}
+				super.traverse(tree)
+			}
+		}
+		val traverser = new ExtractDependenciesTraverser
+		traverser.traverse(unit.body)
+		val dependencies = traverser.depBuf
+		// we might have added NoSymbol while traversing trees, let's remove it here to not worry about it later
+		dependencies -= NoSymbol
+		// we capture enclosing classes only because that's what CompilationUnit.depends does and we don't want
+		// to deviate from old behaviour too much for now
+		traverser.depBuf.map(_.toplevelClass).toSet
 	}
 
 }

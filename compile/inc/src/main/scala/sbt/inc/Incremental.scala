@@ -149,12 +149,40 @@ object Incremental
 
 	def invalidateIncremental(previous: Relations, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
-		val dependsOnSrc = previous.usesInternalSrc _
+		val memberRefFromSrc = (to: java.io.File) => {
+			val deps = previous.usesInternalSrc(to)
+			if (!deps.isEmpty)
+				log.debug("The following dependencies (introduced by member references) pointing at %s are considered for invalidation:\n%s".
+				    format(to, deps.mkString("\n")))
+			deps
+		}
+		val inheritsFromSrc = (to: java.io.File) => {
+		    val deps = previous.usesInternalSrcByInheritance(to)
+		    if (!deps.isEmpty)
+				log.debug("The following inheritance-based dependencies pointing at %s are considered for invalidation:\n%s".
+				    format(to, deps.mkString("\n")))
+			deps
+		}
+	    /**
+	     * Function that determines dependencies on sources (`to` argument) from other files (returned as result).
+	     *
+	     * It takes into account both information from relations (`previous`) and APIChanges (`changes`) so it only
+	     * considers one source file to be dependent on another if names of which hashes changed in `to` appear as
+	     * used names in `from` file.
+	     *
+	     * If there's no information about modified names for `to` argument we consider this to be a case where
+	     * dependency should be preserved because there's not sufficient information that justified dropping it.
+	     *
+	     * Dependencies introduced by inheritance are kept as-is without any further processing.
+	     */
+		val dependsOnSrc = (to: java.io.File) => {
+			memberRefFromSrc(to) ++ inheritsFromSrc(to)
+		}
 		val propagated =
 			if(transitive)
-				transitiveDependencies(dependsOnSrc, changes.modified, log)
+				transitiveDependencies(memberRefFromSrc, inheritsFromSrc, changes.modified, log)
 			else
-				invalidateStage2(dependsOnSrc, changes.modified, log)
+				invalidateStage2(memberRefFromSrc, inheritsFromSrc, changes.modified, log)
 
 		val dups = invalidateDuplicates(previous)
 		if(dups.nonEmpty)
@@ -190,18 +218,24 @@ object Incremental
 	* need to be compiled in step 3 if their dependencies haven't changed.  If there are new cycles introduced after
 	* step 2, these can require step 2 sources to be included in step 3 recompilation.
 	*/
-	def transitiveDependencies(dependsOnSrc: File => Set[File], initial: Set[File], log: Logger): Set[File] =
+	def transitiveDependencies(memberRefFromSrc: File => Set[File], inheritsFromSrc: File => Set[File],
+	    initial: Set[File], log: Logger): Set[File] =
 	{
+		log.debug("Step 3 initial:\n\t" + initial)
 		// include any file that depends on included files
 		def recheck(included: Set[File], process: Set[File], excluded: Set[File]): Set[File] =
 		{
-			val newIncludes = (process flatMap dependsOnSrc) intersect excluded
+			val newIncludes = (process flatMap memberRefFromSrc) intersect excluded
 			if(newIncludes.isEmpty)
 				included
 			else
 				recheck(included ++ newIncludes, newIncludes, excluded -- newIncludes)
 		}
-		val transitiveOnly = transitiveDepsOnly(initial)(dependsOnSrc)
+		val transitiveOnly = {
+			val transitiveOnlyByInheritance = transitiveDepsOnly(initial)(inheritsFromSrc)
+			val directByMemberRef = (initial ++ transitiveOnlyByInheritance) flatMap memberRefFromSrc
+			(transitiveOnlyByInheritance ++ directByMemberRef) filterNot (initial.contains)
+		}
 		log.debug("Step 3 transitive dependencies:\n\t" + transitiveOnly)
 		val stage3 = recheck(transitiveOnly, transitiveOnly, initial)
 		log.debug("Step 3 sources from new step 2 source dependencies:\n\t" + (stage3 -- transitiveOnly))
@@ -209,10 +243,11 @@ object Incremental
 	}
 
 
-	def invalidateStage2(dependsOnSrc: File => Set[File], initial: Set[File], log: Logger): Set[File] =
+	def invalidateStage2(memberRefFromSrc: File => Set[File], inheritsFromSrc: File => Set[File], initial: Set[File], log: Logger): Set[File] =
 	{
-		val initAndImmediate = initial ++ initial.flatMap(dependsOnSrc)
+		val initAndImmediate = initial ++ initial.flatMap(memberRefFromSrc) ++ initial.flatMap(inheritsFromSrc)
 		log.debug("Step 2 changed sources and immdediate dependencies:\n\t" + initAndImmediate)
+		val dependsOnSrc = (f: File) => memberRefFromSrc(f) ++ inheritsFromSrc(f)
 		val components = sbt.inc.StronglyConnected(initAndImmediate)(dependsOnSrc)
 		log.debug("Non-trivial strongly connected components: " + components.filter(_.size > 1).mkString("\n\t", "\n\t", ""))
 		val inv = components.filter(initAndImmediate.exists).flatten

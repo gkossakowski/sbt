@@ -18,13 +18,13 @@ TaskKey[Unit]("check-compilations") <<= (compile in Compile, scalaSource in Comp
     assert(recompiledFiles(iteration) == files, "%s != %s".format(recompiledFiles(iteration), files))
   }
   // dummy files are compiled only initially
-  recompiledFilesInIteration(0, Set("Dummy1.scala", "Dummy2.scala"))
+  recompiledFilesInIteration(0, Set("Dummy1.scala", "Dummy2.scala", "Y.scala"))
   // A.scala is changed is recompiled in iteration 1 but it'll get recompiled once again in iteration 2
   recompiledFilesInIteration(1, Set.empty)
   // change in A.scala causes recompilation of both A.scala and B.scala. B.scala is recompiled becuse it
   // directly depends on A.scala (through inheritance) (this is step 2 of incremental recompilation)
   recompiledFilesInIteration(2, Set("A.scala", "B.scala"))
   // the whole transitive closure of A dependencies gets recompiled (step 3)
-  recompiledFilesInIteration(3, Set("C.scala", "D.scala", "X.scala", "Y.scala"))
+  recompiledFilesInIteration(3, Set("C.scala", "D.scala", "X.scala"))
   assert(allCompilations.size == 4)
 }

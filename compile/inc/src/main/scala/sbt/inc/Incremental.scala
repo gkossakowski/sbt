@@ -94,7 +94,7 @@ object Incremental
 	// Package objects are fragile: if they depend on an invalidated source, get "class file needed by package is missing" error
 	//  This might be too conservative: we probably only need package objects for packages of invalidated sources.
 	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] =
-		invalidated flatMap relations.usesInternalSrc filter { _.getName == "package.scala" }
+		invalidated flatMap relations.usesInternalSrcByInheritance filter { _.getName == "package.scala" }
 
 	/**
 	* Accepts the sources that were recompiled during the last step and functions
@@ -150,7 +150,7 @@ object Incremental
 	def invalidateIncremental(previous: Relations, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
 		val memberRefFromSrc = (to: java.io.File) => {
-			val deps = previous.usesInternalSrc(to)
+			val deps = previous.usesInternalSrcByMemberRef(to)
 			if (!deps.isEmpty)
 				log.debug("The following dependencies (introduced by member references) pointing at %s are considered for invalidation:\n%s".
 				    format(to, deps.mkString("\n")))
@@ -259,7 +259,8 @@ object Incremental
 	def invalidateInitial(previous: Relations, changes: InitialChanges, log: Logger): Set[File] =
 	{
 		val srcChanges = changes.internalSrc
-		val srcDirect = srcChanges.removed ++ srcChanges.removed.flatMap(previous.usesInternalSrc) ++ srcChanges.added ++ srcChanges.changed
+		val dependenciesOnRemovedSrc = srcChanges.removed.flatMap(previous.usesInternalSrcByMemberRef) ++ srcChanges.removed.flatMap(previous.usesInternalSrcByInheritance)
+		val srcDirect = srcChanges.removed ++ dependenciesOnRemovedSrc ++ srcChanges.added ++ srcChanges.changed
 		val byProduct = changes.removedProducts.flatMap(previous.produced)
 		val byBinaryDep = changes.binaryDeps.flatMap(previous.usesBinary)
 		val byExtSrcDep = changes.external.modified.flatMap(previous.usesExternal) // ++ scopeInvalidations

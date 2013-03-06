@@ -30,7 +30,10 @@ object DotGraph
 	{
 		def file(name: String) = new File(outputDir, name)
 		IO.createDirectory(outputDir)
-		generateGraph(file("int-source-deps"), "dependencies", relations.internalSrcDep, sourceToString, sourceToString)
+		generateGraph(file("int-source-deps-by-member-ref"), "dependenciesByMemberRef",
+			relations.internalSrcDepByMemberRef, sourceToString, sourceToString)
+		generateGraph(file("int-source-deps-by-inheritance"), "dependenciesByInheritance",
+			relations.internalSrcDepByInheritance, sourceToString, sourceToString)
 		generateGraph(file("binary-dependencies"), "externalDependencies", relations.binaryDep, externalToString, sourceToString)
 	}
 

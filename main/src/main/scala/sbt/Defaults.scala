@@ -403,10 +403,12 @@ object Defaults extends BuildCommon
 					if (stamps.isEmpty) Long.MinValue else stamps.max
 				}
 				def intlStamp(f: File, analysis: inc.Analysis, s: Set[File]): Long = {
+					def transitively(deps: Set[File]): Set[Long] = deps.map(intlStamp(_, analysis, s + f))
 					if (s contains f) Long.MinValue else
 						stamps.getOrElseUpdate(f, {
 							import analysis.{relations => rel, apis}
-							rel.internalSrcDeps(f).map(intlStamp(_, analysis, s + f)) ++
+							transitively(rel.internalSrcDepsByMemberRef(f)) ++
+							transitively(rel.internalSrcDepsByInheritance(f)) ++
 							rel.externalDeps(f).map(stamp) +
 							apis.internal(f).compilation.startTime
 						}.max)

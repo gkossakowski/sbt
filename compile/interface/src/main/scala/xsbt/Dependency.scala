@@ -33,10 +33,14 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				// build dependencies structure
 				val sourceFile = unit.source.file.file
 				callback.beginSource(sourceFile)
-				val dependencies = extractDependencies(unit)
-				for(on <- dependencies)
-				{
-					def binaryDependency(file: File, className: String) = callback.binaryDependency(file, className, sourceFile)
+				/**
+				 * Handles dependency on given symbol by trying to figure out if represents a term
+				 * that is coming from either source code (not necessarily compiled in this compilation
+				 * run) or from class file and calls respective callback method.
+				 */
+				def handleDependency(on: Symbol): Unit = {
+					def binaryDependency(file: File, className: String) =
+						callback.binaryDependency(file, className, sourceFile)
 					val onSource = on.sourceFile
 					if(onSource == null)
 					{
@@ -56,6 +60,11 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 					else
 						callback.sourceDependency(onSource.file, sourceFile)
 				}
+
+				val dependencies = extractDependencies(unit)
+				for(on <- dependencies)
+					handleDependency(on)
+
 				callback.endSource(sourceFile)
 			}
 		}

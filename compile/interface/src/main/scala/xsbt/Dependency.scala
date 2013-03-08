@@ -81,7 +81,7 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 		var collected: List[T] = Nil
 		def traverse(tpe: Type): Unit = {
 			if (pf.isDefinedAt(tpe))
-			  collected = pf(tpe) :: collected
+				collected = pf(tpe) :: collected
 			mapOver(tpe)
 		}
 	}
@@ -91,8 +91,8 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 		protected def addDependency(dep: Symbol): Unit = depBuf += dep
 
 		def dependencies: collection.immutable.Set[Symbol] = {
-		  // convert to immutable set and remove NoSymbol if we have one
-		  depBuf.toSet - NoSymbol
+			// convert to immutable set and remove NoSymbol if we have one
+			depBuf.toSet - NoSymbol
 		}
 
 		override def traverse(tree: Tree): Unit = {
@@ -100,14 +100,14 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				case Import(expr, selectors) =>
 					selectors.foreach {
 						case ImportSelector(nme.WILDCARD, _, null, _) =>
-					        // in case of wildcard import we do not rely on any particular name being defined
-					        // on `expr`; all symbols that are being used will get caught through selections
+						// in case of wildcard import we do not rely on any particular name being defined
+						// on `expr`; all symbols that are being used will get caught through selections
 						case ImportSelector(name: Name, _, _, _) =>
-						  def lookupImported(name: Name) = expr.symbol.info.member(name)
-						  // importing a name means importing both a term and a type (if they exist)
-						  addDependency(lookupImported(name.toTermName))
-						  addDependency(lookupImported(name.toTypeName))
-				    }
+							def lookupImported(name: Name) = expr.symbol.info.member(name)
+							// importing a name means importing both a term and a type (if they exist)
+							addDependency(lookupImported(name.toTermName))
+							addDependency(lookupImported(name.toTypeName))
+					}
 				case select: Select =>
 					addDependency(select.symbol)
 				/*
@@ -122,7 +122,7 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				    addDependency(ident.symbol)
 				case typeTree: TypeTree =>
 					val typeSymbolCollector = new CollectTypeTraverser({
-					  case tpe if !tpe.typeSymbol.isPackage => tpe.typeSymbol
+						case tpe if !tpe.typeSymbol.isPackage => tpe.typeSymbol
 					})
 					typeSymbolCollector.traverse(typeTree.tpe)
 					val deps = typeSymbolCollector.collected.toSet

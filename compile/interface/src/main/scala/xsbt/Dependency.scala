@@ -70,6 +70,22 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 		}
 	}
 
+	/**
+	 * Traverses given type and collects result of applying a partial function `pf`.
+	 *
+	 * NOTE: This class exists in Scala 2.10 as CollectTypeCollector but does not in earlier
+	 * versions (like 2.9) of Scala compiler that incremental cmpiler supports so we had to
+	 * reimplement that class here.
+	 */
+	private final class CollectTypeTraverser[T](pf: PartialFunction[Type, T]) extends TypeTraverser {
+		var collected: List[T] = Nil
+		def traverse(tpe: Type): Unit = {
+			if (pf.isDefinedAt(tpe))
+			  collected = pf(tpe) :: collected
+			mapOver(tpe)
+		}
+	}
+
 	private class ExtractDependenciesTraverser extends Traverser {
 		protected val depBuf = collection.mutable.ArrayBuffer.empty[Symbol]
 		protected def addDependency(dep: Symbol): Unit = depBuf += dep
@@ -105,7 +121,12 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				case ident: Ident =>
 				    addDependency(ident.symbol)
 				case typeTree: TypeTree =>
-					addDependency(typeTree.symbol)
+					val typeSymbolCollector = new CollectTypeTraverser({
+					  case tpe if !tpe.typeSymbol.isPackage => tpe.typeSymbol
+					})
+					typeSymbolCollector.traverse(typeTree.tpe)
+					val deps = typeSymbolCollector.collected.toSet
+					deps.foreach(addDependency)
 				case other => ()
 			}
 			super.traverse(tree)

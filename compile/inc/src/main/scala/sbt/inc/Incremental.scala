@@ -260,7 +260,7 @@ object Incremental
 	/** Intermediate invalidation step: steps after the initial invalidation, but before the final transitive invalidation. */
 	def invalidateIntermediate(relations: Relations, modified: Set[File], log: Logger): Set[File] =
 	{
-		def reverse(r: Relations.Source) = r.internal.reverse _
+		def reverse(r: Relations.SourceDependencies) = r.internal.reverse _
 		invalidateSources(reverse(relations.direct), reverse(relations.publicInherited), modified, log)
 	}
 	/** Invalidates inheritance dependencies, transitively.  Then, invalidates direct dependencies.  Finally, excludes initial dependencies not

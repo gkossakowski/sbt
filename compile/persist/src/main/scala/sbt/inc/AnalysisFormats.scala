@@ -13,7 +13,7 @@ package inc
 	import DefaultProtocol._
 	import DefaultProtocol.tuple2Format
 	import Logger.{m2o, position, problem}
-	import Relations.{Source => RSource}
+	import Relations.SourceDependencies
 
 object AnalysisFormats
 {
@@ -98,11 +98,11 @@ object AnalysisFormats
 	implicit def apisFormat(implicit internalF: Format[Map[File, Source]], externalF: Format[Map[String, Source]]): Format[APIs] =
 		asProduct2( APIs.apply _)( as => (as.internal, as.external) )(internalF, externalF)
 
-	implicit def relationsFormat(implicit prodF: Format[RFF], binF: Format[RFF], directF: Format[RSource], inheritedF: Format[RSource], csF: Format[RFS]): Format[Relations] =
-		asProduct5[Relations, RFF, RFF, RSource, RSource, RFS]( (a,b,c,d,e) => Relations.make(a,b,c,d,e) )( rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.classes) )(prodF, binF, directF, inheritedF, csF)
+	implicit def relationsFormat(implicit prodF: Format[RFF], binF: Format[RFF], directF: Format[SourceDependencies], inheritedF: Format[SourceDependencies], csF: Format[RFS]): Format[Relations] =
+		asProduct5[Relations, RFF, RFF, SourceDependencies, SourceDependencies, RFS]( (a,b,c,d,e) => Relations.make(a,b,c,d,e) )( rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.classes) )(prodF, binF, directF, inheritedF, csF)
 
-	implicit def relationsSourceFormat(implicit internalFormat: Format[Relation[File, File]], externalFormat: Format[Relation[File,String]]): Format[RSource] =
-		asProduct2[RSource, RFF, RFS]( (a, b) => Relations.makeSource(a,b))( rs => (rs.internal, rs.external))
+	implicit def relationsSourceFormat(implicit internalFormat: Format[Relation[File, File]], externalFormat: Format[Relation[File,String]]): Format[SourceDependencies] =
+		asProduct2[SourceDependencies, RFF, RFS]( (a, b) => Relations.makeSourceDependencies(a,b))( rs => (rs.internal, rs.external))
 
 	implicit def relationFormat[A,B](implicit af: Format[Map[A, Set[B]]], bf: Format[Map[B, Set[A]]]): Format[Relation[A,B]] =
 		asProduct2[Relation[A,B], Map[A, Set[B]], Map[B, Set[A]]]( Relation.make _ )( r => (r.forwardMap, r.reverseMap) )(af, bf)

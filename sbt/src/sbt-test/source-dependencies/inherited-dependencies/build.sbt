@@ -10,17 +10,17 @@ verifyDeps := {
 		val absoluteFiles = a.relations.publicInherited.internal.forward(file)
 		absoluteFiles.map(relative)
 	}
-	val ADeps = Set("C", "D", "E", "G", "J").map(toFile)
+	val ADeps = Set("C", "J", "E").map(toFile)
 	same(inheritedDeps("A"), ADeps)
-	val BDeps = Set.empty[File]
+	val BDeps = Set("D", "E", "J").map(toFile)
 	same(inheritedDeps("B"), BDeps)
-	val CDeps = Set("D", "G", "J").map(toFile)
+	val CDeps = Set("D", "J").map(toFile)
 	same(inheritedDeps("C"), CDeps)
 	val DDeps = Set("G", "J").map(toFile)
 	same(inheritedDeps("D"), DDeps)
 	val EDeps = Set.empty[File]
 	same(inheritedDeps("E"), EDeps)
-	val FDeps = Set("C", "D", "G", "J").map(toFile)
+	val FDeps = Set.empty[File]
 	same(inheritedDeps("F"), FDeps)
 	val GDeps = Set("J").map(toFile)
 	same(inheritedDeps("G"), GDeps)

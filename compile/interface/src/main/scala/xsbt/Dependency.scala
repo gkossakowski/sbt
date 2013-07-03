@@ -29,10 +29,7 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 				// build dependencies structure
 				val sourceFile = unit.source.file.file
 				callback.beginSource(sourceFile)
-				val dependencies = extractDependencies(unit)
-				for(on <- dependencies) processDependency(on, inherited=false)
-				for(on <- inheritedDependencies.getOrElse(sourceFile, Nil: Iterable[Symbol])) processDependency(on, inherited=true)
-                /**
+				/**
 				 * Handles dependency on given symbol by trying to figure out if represents a term
 				 * that is coming from either source code (not necessarily compiled in this compilation
 				 * run) or from class file and calls respective callback method.
@@ -60,6 +57,14 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 						callback.sourceDependency(onSource.file, sourceFile, inherited)
 				}
 
+				val dependenciesByMemberRef = extractDependenciesByMemberRef(unit)
+				for(on <- dependenciesByMemberRef)
+					processDependency(on, inherited=false)
+
+				val dependenciesByInheritance = extractDependenciesByInheritance(unit)
+				for(on <- dependenciesByInheritance)
+					processDependency(on, inherited=true)
+
 				callback.endSource(sourceFile)
 			}
 		}
@@ -81,15 +86,16 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 		}
 	}
 
-	private class ExtractDependenciesTraverser extends Traverser {
+	private abstract class ExtractDependenciesTraverser extends Traverser {
 		protected val depBuf = collection.mutable.ArrayBuffer.empty[Symbol]
 		protected def addDependency(dep: Symbol): Unit = depBuf += dep
-
 		def dependencies: collection.immutable.Set[Symbol] = {
 			// convert to immutable set and remove NoSymbol if we have one
 			depBuf.toSet - NoSymbol
 		}
+	}
 
+	private class ExtractDependenciesByMemberRefTraverser extends ExtractDependenciesTraverser {
 		override def traverse(tree: Tree): Unit = {
 			tree match {
 				case Import(expr, selectors) =>
@@ -122,18 +128,46 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 					typeSymbolCollector.traverse(typeTree.tpe)
 					val deps = typeSymbolCollector.collected.toSet
 					deps.foreach(addDependency)
+				case Template(parents, self, body) =>
+					traverseTrees(body)
 				case other => ()
 			}
 			super.traverse(tree)
 		}
 	}
 
-	def extractDependencies(unit: CompilationUnit): collection.immutable.Set[Symbol] = {
-		val traverser = new ExtractDependenciesTraverser
+	private def extractDependenciesByMemberRef(unit: CompilationUnit): collection.immutable.Set[Symbol] = {
+		val traverser = new ExtractDependenciesByMemberRefTraverser
 		traverser.traverse(unit.body)
 		val dependencies = traverser.dependencies
 		// we capture enclosing classes only because that's what CompilationUnit.depends does and we don't want
 		// to deviate from old behaviour too much for now
+		dependencies.map(_.toplevelClass)
+	}
+
+	/** Copied straight from Scala 2.10 as it does not exist in Scala 2.9 compiler */
+	private final def debuglog(msg: => String) {
+		if (settings.debug.value)
+			log(msg)
+	}
+
+	private final class ExtractDependenciesByInheritanceTraverser extends ExtractDependenciesTraverser {
+		override def traverse(tree: Tree): Unit = tree match {
+			case Template(parents, self, body) =>
+				// we are using typeSymbol and not typeSymbolDirect because we want
+				// type aliases to be expanded
+				val parentTypeSymbols = parents.map(parent => parent.tpe.typeSymbol).toSet
+				debuglog("Parent type symbols for " + tree.pos + ": " + parentTypeSymbols.map(_.fullName))
+				parentTypeSymbols.foreach(addDependency)
+				traverseTrees(body)
+			case tree => super.traverse(tree)
+		}
+	}
+
+	private def extractDependenciesByInheritance(unit: CompilationUnit): collection.immutable.Set[Symbol] = {
+		val traverser = new ExtractDependenciesByInheritanceTraverser
+		traverser.traverse(unit.body)
+		val dependencies = traverser.dependencies
 		dependencies.map(_.toplevelClass)
 	}
 

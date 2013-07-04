@@ -16,13 +16,13 @@ trait Analysis
 	val infos: SourceInfos
 	/** Information about compiler runs accumulated since `clean` command has been run. */
 	val compilations: Compilations
-	
+
 	def ++(other: Analysis): Analysis
 	def -- (sources: Iterable[File]): Analysis
 	def copy(stamps: Stamps = stamps, apis: APIs = apis, relations: Relations = relations, infos: SourceInfos = infos,
 	    compilations: Compilations = compilations): Analysis
-	
-	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File], info: SourceInfo): Analysis
+
+	def addSource(src: File, api: Source, stamp: Stamp, memberRefInternalDeps: Iterable[File], inheritedInternalDeps: Iterable[File], info: SourceInfo): Analysis
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis
 	def addExternalDep(src: File, dep: String, api: Source, inherited: Boolean): Analysis
 	def addProduct(src: File, product: File, stamp: Stamp, name: String): Analysis
@@ -69,7 +69,7 @@ private class MAnalysis(val stamps: Stamps, val apis: APIs, val relations: Relat
 	{
 		val newRelations = relations -- sources
 		def keep[T](f: (Relations, T) => Set[_]): T => Boolean = keepFor(newRelations)(f)
-		
+
 		val newAPIs = apis.removeInternal(sources).filterExt( keep(_ usesExternal _) )
 		val newStamps = stamps.filter( keep(_ produced _), sources, keep(_ usesBinary _))
 		val newInfos = infos -- sources

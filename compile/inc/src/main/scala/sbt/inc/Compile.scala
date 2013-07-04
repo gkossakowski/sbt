@@ -165,9 +165,9 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			val hasMacro: Boolean = macroSources.contains(src)
 			val s = new xsbti.api.Source(compilation, hash, api._2, api._1, hasMacro)
 			val info = SourceInfos.makeInfo(getOrNil(reporteds, src), getOrNil(unreporteds, src))
-			val direct = sourceDeps.getOrElse(src, Nil: Iterable[File])
-			val publicInherited = inheritedSourceDeps.getOrElse(src, Nil: Iterable[File])
-			a.addSource(src, s, stamp, direct, publicInherited, info)
+			val memberRefDeps = sourceDeps.getOrElse(src, Nil: Iterable[File])
+			val inheritanceDeps = inheritedSourceDeps.getOrElse(src, Nil: Iterable[File])
+			a.addSource(src, s, stamp, memberRefDeps, inheritanceDeps, info)
 		}
 	def getOrNil[A,B](m: collection.Map[A, Seq[B]], a: A): Seq[B] = m.get(a).toList.flatten
 	def addExternals(base: Analysis): Analysis = (base /: extSrcDeps) { case (a, (source, name, api, inherited)) => a.addExternalDep(source, name, api, inherited) }

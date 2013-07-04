@@ -99,7 +99,7 @@ object AnalysisFormats
 		asProduct2( APIs.apply _)( as => (as.internal, as.external) )(internalF, externalF)
 
 	implicit def relationsFormat(implicit prodF: Format[RFF], binF: Format[RFF], directF: Format[SourceDependencies], inheritedF: Format[SourceDependencies], csF: Format[RFS]): Format[Relations] =
-		asProduct5[Relations, RFF, RFF, SourceDependencies, SourceDependencies, RFS]( (a,b,c,d,e) => Relations.make(a,b,c,d,e) )( rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.classes) )(prodF, binF, directF, inheritedF, csF)
+		asProduct5[Relations, RFF, RFF, SourceDependencies, SourceDependencies, RFS]( (a,b,c,d,e) => Relations.make(a,b,c,d,e) )( rs => (rs.srcProd, rs.binaryDep, rs.memberRef, rs.inheritance, rs.classes) )(prodF, binF, directF, inheritedF, csF)
 
 	implicit def relationsSourceFormat(implicit internalFormat: Format[Relation[File, File]], externalFormat: Format[Relation[File,String]]): Format[SourceDependencies] =
 		asProduct2[SourceDependencies, RFF, RFS]( (a, b) => Relations.makeSourceDependencies(a,b))( rs => (rs.internal, rs.external))

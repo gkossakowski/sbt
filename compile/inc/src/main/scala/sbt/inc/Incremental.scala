@@ -99,7 +99,7 @@ object Incremental
 	// Package objects are fragile: if they inherit from an invalidated source, get "class file needed by package is missing" error
 	//  This might be too conservative: we probably only need package objects for packages of invalidated sources.
 	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] =
-		invalidated flatMap relations.publicInherited.internal.reverse filter { _.getName == "package.scala" }
+		invalidated flatMap relations.inheritance.internal.reverse filter { _.getName == "package.scala" }
 
 	/**
 	 * Logs API changes using debug-level logging. The API are obtained using the APIDiff class.
@@ -246,33 +246,33 @@ object Incremental
 	{
 		// Propagate public inheritance dependencies transitively.
 		// This differs from normal because we need the initial crossing from externals to sources in this project.
-		val externalInheritedR = relations.publicInherited.external
-		val byExternalInherited = external flatMap externalInheritedR.reverse
-		val internalInheritedR = relations.publicInherited.internal
-		val transitiveInherited = transitiveDeps(byExternalInherited)(internalInheritedR.reverse _)
+		val externalInheritanceR = relations.inheritance.external
+		val byExternalInheritance = external flatMap externalInheritanceR.reverse
+		val internalInheritanceR = relations.inheritance.internal
+		val transitiveInheritance = transitiveDeps(byExternalInheritance)(internalInheritanceR.reverse _)
 
 		// Get the direct dependencies of all sources transitively invalidated by inheritance
-		val directA = transitiveInherited flatMap relations.direct.internal.reverse
+		val directA = transitiveInheritance flatMap relations.memberRef.internal.reverse
 		// Get the sources that directly depend on externals.  This includes non-inheritance dependencies and is not transitive.
 		val directB = external flatMap relations.direct.external.reverse
-		transitiveInherited ++ directA ++ directB
+		transitiveInheritance ++ directA ++ directB
 	}
 	/** Intermediate invalidation step: steps after the initial invalidation, but before the final transitive invalidation. */
 	def invalidateIntermediate(relations: Relations, modified: Set[File], log: Logger): Set[File] =
 	{
 		def reverse(r: Relations.SourceDependencies) = r.internal.reverse _
-		invalidateSources(reverse(relations.direct), reverse(relations.publicInherited), modified, log)
+		invalidateSources(reverse(relations.memberRef), reverse(relations.inheritance), modified, log)
 	}
 	/** Invalidates inheritance dependencies, transitively.  Then, invalidates direct dependencies.  Finally, excludes initial dependencies not
 	* included in a cycle with newly invalidated sources. */
-	private[this] def invalidateSources(directDeps: File => Set[File], publicInherited: File => Set[File], initial: Set[File], log: Logger): Set[File] =
+	private[this] def invalidateSources(memberRefDeps: File => Set[File], inheritanceDeps: File => Set[File], initial: Set[File], log: Logger): Set[File] =
 	{
-		val transitiveInherited = transitiveDeps(initial)(publicInherited)
-		log.debug("Invalidated by transitive public inheritance: " + transitiveInherited)
-		val direct = transitiveInherited flatMap directDeps
-		log.debug("Invalidated by direct dependency: " + direct)
-		val all = transitiveInherited ++ direct
-		includeInitialCond(initial, all, f => directDeps(f) ++ publicInherited(f), log)
+		val transitiveInheritance = transitiveDeps(initial)(inheritanceDeps)
+		log.debug("Invalidated by transitive inheritance dependency: " + transitiveInheritance)
+		val memberRef = transitiveInheritance flatMap memberRefDeps
+		log.debug("Invalidated by member reference dependency: " + memberRef)
+		val all = transitiveInheritance ++ memberRef
+		includeInitialCond(initial, all, f => memberRefDeps(f) ++ inheritanceDeps(f), log)
 	}
 	/** Conditionally include initial sources that are dependencies of newly invalidated sources.
 	** Initial sources included in this step can be because of a cycle, but not always. */

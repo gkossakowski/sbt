@@ -5,6 +5,7 @@ $ copy-file changes/A1.scala src/main/scala/A.scala
 > check-number-of-compiler-iterations 2
 $ copy-file changes/D0.scala src/main/scala/D.scala
 > compile
+> verify-dependencies
 $ copy-file changes/C1.scala src/main/scala/C.scala
 > compile
 > verify-compilation-time

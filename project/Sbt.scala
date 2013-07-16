@@ -103,7 +103,7 @@ object Sbt extends Build
 
 		// Implements the core functionality of detecting and propagating changes incrementally.
 		//   Defines the data structures for representing file fingerprints and relationships and the overall source analysis
-	lazy val compileIncrementalSub = testedBaseProject(compilePath / "inc", "Incremental Compiler") dependsOn(apiSub, ioSub, logSub, classpathSub, relationSub)
+	lazy val compileIncrementalSub = testedBaseProject(compilePath / "inc", "Incremental Compiler") dependsOn(apiSub, ioSub, logSub, classpathSub, relationSub) settings(libraryDependencies += "com.googlecode.java-diff-utils" % "diffutils" % "1.2.1")
 		// Persists the incremental data structures using SBinary
 	lazy val compilePersistSub = baseProject(compilePath / "persist", "Persist") dependsOn(compileIncrementalSub, apiSub) settings(sbinary)
 		// sbt-side interface to compiler.  Calls compiler-side interface reflectively

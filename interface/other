@@ -3,7 +3,12 @@ Source
 	hash: Byte*
 	api: SourceAPI
 	apiHash: Int
+	nameHashes: NameHash*
 	hasMacro: Boolean
+
+NameHash
+	name: String
+	hash: Int
 
 SourceAPI
 	packages : Package*

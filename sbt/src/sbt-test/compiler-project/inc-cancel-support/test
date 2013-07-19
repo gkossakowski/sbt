@@ -1,0 +1,16 @@
+# Tests for bug when sbt would introduce dependency on non-existing
+# class files corresponding to packages
+
+$ exec echo "First compile"
+> compile
+$ copy-file changes/A1.scala src/main/scala/test/A.scala
+$ exec echo "Set cancel to true"
+> eval System.setProperty("xsbt.inc.cancel", true.toString)
+$ exec echo "Second compile (should be cancelled)"
+> compile
+$ exec echo "Set cancel to false"
+> eval System.setProperty("xsbt.inc.cancel", false.toString)
+$ exec echo "This compile (should recompile A.scala)"
+> compile
+> last compile
+$ fail

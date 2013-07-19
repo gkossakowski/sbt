@@ -127,7 +127,7 @@ object AnalyzingCompiler
 {
 	import sbt.IO.{copy, createDirectory, zip, jars, unzip, withTemporaryDirectory}
 
-	// Note: The Scala build now depends on some details of this method: 
+	// Note: The Scala build now depends on some details of this method:
 	//   https://github.com/jsuereth/scala/commit/3431860048df8d2a381fb85a526097e00154eae0
 	/** Extract sources from source jars, compile them with the xsbti interfaces on the classpath, and package the compiled classes and
 	* any resources from the source jars into a final jar.*/
@@ -159,5 +159,10 @@ object AnalyzingCompiler
 
 private[this] object IgnoreProgress extends CompileProgress {
 	def startUnit(phase: String, unitPath: String) {}
-	def advance(current: Int, total: Int) = true
+	def advance(current: Int, total: Int): Boolean = {
+		val shouldCancel = java.lang.Boolean.valueOf(System.getProperty("xsbt.inc.cancel"))
+		val moreThanHalfProcessed = current > total/2
+		val willCancel = (shouldCancel && moreThanHalfProcessed)
+		!willCancel
+	}
 }

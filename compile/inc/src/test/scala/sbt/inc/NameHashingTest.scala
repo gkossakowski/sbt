@@ -72,6 +72,48 @@ class NameHashingTest {
 	}
 
 	/**
+	 * Test if members introduced in parent class affect hash of a name
+	 * of a child class.
+	 *
+	 * For example, if we have:
+	 * // Test1.scala
+	 * class Parent
+	 * class Child extends Parent
+	 *
+	 * and:
+	 * // Test2.scala
+	 * class Parent { def bar: Int = ... }
+	 * class Child extends Parent
+	 *
+	 * then hash for `Child` name should be the same in both
+	 * cases.
+	 */
+	@Test
+	def definitionInParentClass: Unit = {
+		val nameHashing = new NameHashing
+		val deff = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
+		val parentA = simpleClass("Parent")
+		val barMethod = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
+		val parentB = simpleClass("Foo", barMethod)
+		val childA = {
+			val structure = new Structure(lzy(Array[Type](parentA.structure)), lzy(Array.empty[Definition]), lzy(Array.empty[Definition]))
+			simpleClass("Child", structure)
+		}
+		val childB = {
+			val structure = new Structure(lzy(Array[Type](parentB.structure)), lzy(Array.empty[Definition]), lzy(Array[Definition](barMethod)))
+			simpleClass("Child", structure)
+		}
+		val parentApiA = new SourceAPI(Array.empty, Array(parentA))
+		val parentApiB = new SourceAPI(Array.empty, Array(parentB))
+		val childApiA = new SourceAPI(Array.empty, Array(childA))
+		val childApiB = new SourceAPI(Array.empty, Array(childB))
+		val nameHashes1 = nameHashing.nameHashes(childApiA).map(convertToTuple)
+		val nameHashes2 = nameHashing.nameHashes(childApiB).map(convertToTuple)
+		//val nameHashes2 = nameHashing.nameHashes(api2).map(convertToTuple)
+		assertEquals(nameHashes1, nameHashes2)
+	}
+
+	/**
 	 * NameHash doesn't define equals() and hashCode() so if you want to compare
 	 * name hashes you need to map them to a tuple.
 	 */
@@ -81,8 +123,12 @@ class NameHashingTest {
 
 	private def simpleStructure(defs: Definition*) = new Structure(lzy(Array.empty[Type]), lzy(defs.toArray), lzy(Array.empty[Definition]))
 
-	private def simpleClass(name: String, defs: Definition*) = {
+	private def simpleClass(name: String, defs: Definition*): ClassLike = {
 		val structure = simpleStructure(defs: _*)
+		simpleClass(name, structure)
+	}
+
+	private def simpleClass(name: String, structure: Structure): ClassLike = {
 		new ClassLike(DefinitionType.ClassDef, lzy(emptyType), lzy(structure), Array.empty, Array.empty, name, publicAccess, defaultModifiers, Array.empty)
 	}
 

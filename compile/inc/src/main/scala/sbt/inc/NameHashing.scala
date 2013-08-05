@@ -3,6 +3,7 @@ package sbt.inc
 import xsbti.api.SourceAPI
 import xsbti.api.Definition
 import xsbti.api.DefinitionType
+import xsbti.api.ClassLike
 
 /**
  * A class that computes hashes for each group of definitions grouped by a simple name.
@@ -37,12 +38,7 @@ class NameHashing {
 
 	private def publicDefs(source: SourceAPI): scala.collection.immutable.Set[LocatedDefinition] = {
 		val defs = scala.collection.mutable.Set[LocatedDefinition]()
-		val flatPackageName = source.packages().map(_.name).mkString(".")
-		def packageAsLocation(pkg: String): Location = {
-			val selectors = flatPackageName.split('.').map(name => Selector(name, TermName)).toSeq
-			Location(selectors: _*)
-		}
-		var currentLocation: Location = packageAsLocation(flatPackageName)
+		var currentLocation: Location = Location()
 		def extractAllNestedDefs(deff: Definition): Unit = {
 			val locatedDef = LocatedDefinition(currentLocation, deff)
 			if (!defs.contains(locatedDef)) {
@@ -50,24 +46,41 @@ class NameHashing {
 				deff match {
 					case cl: xsbti.api.ClassLike =>
 						val savedLocation = currentLocation
-						val selector = {
-							val clNameType = NameType(cl.definitionType)
-							Selector(localName(cl.name), clNameType)
-						}
-						currentLocation = Location((savedLocation.selectors :+ selector): _*)
+						currentLocation = classLikeAsLocation(currentLocation, cl)
 						cl.structure().declared().foreach(extractAllNestedDefs)
 						currentLocation = savedLocation
 					case _ => ()
 				}
 			}
 		}
-		source.definitions.foreach(extractAllNestedDefs)
+		source.definitions.foreach { case topLevelDef: ClassLike =>
+			val packageName = {
+				val fullName = topLevelDef.name()
+				val lastDotIndex = fullName.lastIndexOf('.')
+				if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex-1)
+			}
+			currentLocation = classLikeAsLocation(packageAsLocation(packageName), topLevelDef)
+			extractAllNestedDefs(topLevelDef)
+		}
 		defs.toSet
 	}
 
 	private def localName(name: String): String = {
 	  val index = name.lastIndexOf('.') + 1
 	  name.substring(index)
+	}
+
+	private def packageAsLocation(pkg: String): Location = if (pkg != "") {
+		val selectors = pkg.split('.').map(name => Selector(name, TermName)).toSeq
+		Location(selectors: _*)
+	} else Location()
+
+	private def classLikeAsLocation(prefix: Location, cl: ClassLike): Location = {
+		val selector = {
+			val clNameType = NameType(cl.definitionType)
+			Selector(localName(cl.name), clNameType)
+		}
+		Location((prefix.selectors :+ selector): _*)
 	}
 }
 
@@ -90,6 +103,6 @@ object NameHashing {
 			case Module | PackageModule => TermName
 		}
 	}
-	private object TermName extends NameType
-	private object TypeName extends NameType
+	private case object TermName extends NameType
+	private case object TypeName extends NameType
 }

@@ -199,7 +199,7 @@ object Incremental
 
 	def invalidateIncremental(previous: Relations, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
-		val memberRefReversed: File => Set[File] = previous.memberRef.internal.reverseMap
+		val memberRefReversed: File => Set[File] = previous.memberRef.internal.reverse _
 		val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
 		val dependsOnSrc: File => Set[File] = { to =>
 			val byInheritance = previous.inheritance.internal.reverse(to)

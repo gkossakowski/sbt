@@ -114,7 +114,7 @@ object Incremental
 			changes.zipped foreach {
 				case (src, oldApi, newApi) =>
 					val apiUnifiedPatch = apiDiff.generateApiDiff(src.toString, oldApi.api, newApi.api, contextSize)
-					log.debug("Detected a change in a public API:\n" + apiUnifiedPatch)
+					log.debug("Detected a change in a public API (" + src.toString + "):\n" + apiUnifiedPatch)
 			}
 		} catch {
 			case e: ClassNotFoundException =>

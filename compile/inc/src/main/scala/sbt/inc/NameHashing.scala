@@ -31,8 +31,8 @@ class NameHashing {
 			hashAPI.hashDefinitionsWithExtraHashes(defsWithExtraHashes)
 			hashAPI.finalizeHash
 		}
-		def localName(x: LocatedDefinition) = x.location.selectors.last.name
-		val publicDefsHashes = apiPublicDefs.groupBy(localName).mapValues(hashLocatedDefinitions)
+		val groupedApiPublicDefs = apiPublicDefs.groupBy(locatedDef => localName(locatedDef.definition.name))
+		val publicDefsHashes = groupedApiPublicDefs.mapValues(hashLocatedDefinitions)
 		publicDefsHashes.toSeq.map({case (name: String, hash: Int) => new xsbti.api.NameHash(name, hash) }).toSet
 	}
 
@@ -59,7 +59,7 @@ class NameHashing {
 				val lastDotIndex = fullName.lastIndexOf('.')
 				if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex-1)
 			}
-			currentLocation = classLikeAsLocation(packageAsLocation(packageName), topLevelDef)
+			currentLocation = packageAsLocation(packageName)
 			extractAllNestedDefs(topLevelDef)
 		}
 		defs.toSet
@@ -94,6 +94,9 @@ object NameHashing {
 	 * selections that uniquely identify a given Symbol.
 	 */
 	private case class Location(selectors: Selector*)
+	private object Location {
+		val Empty = Location(Seq.empty: _*)
+	}
 	private case class Selector(name: String, nameType: NameType)
 	private sealed trait NameType
 	private object NameType {

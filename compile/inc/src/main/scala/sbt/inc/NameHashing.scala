@@ -23,9 +23,9 @@ class NameHashing {
 	 * NOTE: The hashing sum used for hashing a group of definition is insensitive
 	 * to order of definitions.
 	 */
-	def nameHashes(source: SourceAPI): scala.collection.immutable.Set[xsbti.api.NameHash] = {
+	def nameHashes(source: SourceAPI): Set[xsbti.api.NameHash] = {
 		val apiPublicDefs = publicDefs(source)
-		def hashLocatedDefinitions(locatedDefs: scala.collection.immutable.Set[LocatedDefinition]): Int = {
+		def hashLocatedDefinitions(locatedDefs: Set[LocatedDefinition]): Int = {
 			val defsWithExtraHashes = locatedDefs.toSeq.map(ld => ld.definition -> ld.location.hashCode)
 			val hashAPI = new xsbt.api.HashAPI(false, true, false)
 			hashAPI.hashDefinitionsWithExtraHashes(defsWithExtraHashes)
@@ -36,7 +36,7 @@ class NameHashing {
 		publicDefsHashes.toSeq.map({case (name: String, hash: Int) => new xsbti.api.NameHash(name, hash) }).toSet
 	}
 
-	private def publicDefs(source: SourceAPI): scala.collection.immutable.Set[LocatedDefinition] = {
+	private def publicDefs(source: SourceAPI): Set[LocatedDefinition] = {
 		val locatedDefs = scala.collection.mutable.Buffer[LocatedDefinition]()
 		val visitedDefs =  scala.collection.mutable.Set[Definition]()
 		var currentLocation: Location = Location()

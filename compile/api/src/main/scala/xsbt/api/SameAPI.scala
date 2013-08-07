@@ -8,6 +8,7 @@ import xsbti.api._
 import Function.tupled
 import scala.collection.{immutable, mutable}
 
+@deprecated
 class NameChanges(val newTypes: Set[String], val removedTypes: Set[String], val newTerms: Set[String], val removedTerms: Set[String])
 {
 	override def toString =
@@ -19,11 +20,13 @@ class NameChanges(val newTypes: Set[String], val removedTypes: Set[String], val 
 
 object TopLevel
 {
+	@deprecated
 	def nameChanges(a: Iterable[Source], b: Iterable[Source]): NameChanges = {
 		val api = (_: Source).api
 		apiNameChanges(a map api, b map api)
 	}
 	/** Identifies removed and new top-level definitions by name. */
+	@deprecated
 	def apiNameChanges(a: Iterable[SourceAPI], b: Iterable[SourceAPI]): NameChanges =
 	{
 		def changes(s: Set[String], t: Set[String]) = (s -- t, t -- s)

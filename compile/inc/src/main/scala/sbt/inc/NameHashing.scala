@@ -37,17 +37,20 @@ class NameHashing {
 	}
 
 	private def publicDefs(source: SourceAPI): scala.collection.immutable.Set[LocatedDefinition] = {
-		val defs = scala.collection.mutable.Set[LocatedDefinition]()
+		val locatedDefs = scala.collection.mutable.Buffer[LocatedDefinition]()
+		val visitedDefs =  scala.collection.mutable.Set[Definition]()
 		var currentLocation: Location = Location()
 		def extractAllNestedDefs(deff: Definition): Unit = {
 			val locatedDef = LocatedDefinition(currentLocation, deff)
-			if (!defs.contains(locatedDef)) {
-				defs += locatedDef
+			if (!visitedDefs.contains(deff)) {
+				locatedDefs += locatedDef
+				visitedDefs += deff
 				deff match {
 					case cl: xsbti.api.ClassLike =>
 						val savedLocation = currentLocation
 						currentLocation = classLikeAsLocation(currentLocation, cl)
 						cl.structure().declared().foreach(extractAllNestedDefs)
+						cl.structure().inherited().foreach(extractAllNestedDefs)
 						currentLocation = savedLocation
 					case _ => ()
 				}
@@ -62,7 +65,7 @@ class NameHashing {
 			currentLocation = packageAsLocation(packageName)
 			extractAllNestedDefs(topLevelDef)
 		}
-		defs.toSet
+		locatedDefs.toSet
 	}
 
 	private def localName(name: String): String = {

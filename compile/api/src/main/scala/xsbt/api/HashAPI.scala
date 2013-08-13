@@ -26,10 +26,11 @@ object HashAPI
  *
  * @param includePrivate should private definitions be included in a hash sum
  * @param includeParamNames should parameter names for methods be included in a hash sum
- * @param includeDefintions when hashing a structure (e.g. of a class) should hashes of definitions (members)
- *   be included in a hash sum.
+ * @param includeDefinitions when hashing a structure (e.g. of a class) should hashes of definitions (members)
+ *   be included in a hash sum. Structure can appear as a type (in structural type) and in that case we
+ *   always include definitions in a hash sum.
  */
-final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, includeDefintions: Boolean)
+final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, includeDefinitions: Boolean)
 {
 	import scala.collection.mutable
 	import MurmurHash.{extendHash, finalizeHash, nextMagicA, nextMagicB, startHash, startMagicA, startMagicB, stringHash, symmetricHash}
@@ -180,7 +181,7 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
 		extend(ClassHash)
 		hashParameterizedDefinition(c)
 		hashType(c.selfType)
-		hashStructure(c.structure)
+		hashStructure(c.structure, includeDefinitions)
 	}
 	def hashField(f: FieldLike)
 	{
@@ -279,11 +280,12 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
 		hashString(arg.value)
 	}
 
-	def hashTypes(ts: Seq[Type]) = hashSeq(ts, hashType)
-	def hashType(t: Type): Unit =
+	def hashTypes(ts: Seq[Type], includeDefinitions: Boolean = true) =
+		hashSeq(ts, (t: Type) => hashType(t, includeDefinitions))
+	def hashType(t: Type, includeDefinitions: Boolean = true): Unit =
 		t match
 		{
-			case s: Structure => hashStructure(s)
+			case s: Structure => hashStructure(s, includeDefinitions)
 			case e: Existential => hashExistential(e)
 			case c: Constant => hashConstant(c)
 			case p: Polymorphic => hashPolymorphic(p)
@@ -357,12 +359,13 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
 		hashType(a.baseType)
 		hashAnnotations(a.annotations)
 	}
-	final def hashStructure(structure: Structure) = visit(visitedStructures, structure)(hashStructure0)
-	def hashStructure0(structure: Structure)
+	final def hashStructure(structure: Structure, includeDefinitions: Boolean) =
+		visit(visitedStructures, structure)(structure => hashStructure0(structure, includeDefinitions))
+	def hashStructure0(structure: Structure, includeDefinitions: Boolean)
 	{
 		extend(StructureHash)
-		hashTypes(structure.parents)
-		if (includeDefintions) {
+		hashTypes(structure.parents, includeDefinitions)
+		if (includeDefinitions) {
 		  hashDefinitions(structure.declared, false)
 		  hashDefinitions(structure.inherited, false)
 		}

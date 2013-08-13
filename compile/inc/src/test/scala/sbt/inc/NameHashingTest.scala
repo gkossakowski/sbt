@@ -118,6 +118,69 @@ class NameHashingTest {
 		assertEquals(childNameHashA, childNameHashB)
 	}
 
+	/**
+	 * Checks if changes to structural types that appear in method signature
+	 * affect name hash of the method. For example, if we have:
+	 *
+	 * // Test1.scala
+	 * class A {
+	 * 	def foo: { bar: Int }
+	 * }
+	 *
+	 * // Test2.scala
+	 * class A {
+	 *   def foo: { bar: String }
+	 * }
+	 *
+	 * then name hash for "foo" should be different in those two cases.
+	 */
+	@Test
+	def structuralTypeInDefinition: Unit = {
+		/** def foo: { bar: Int } */
+		val fooMethod1 = {
+			val barMethod1 = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
+			new Def(Array.empty, simpleStructure(barMethod1), Array.empty, "foo", publicAccess, defaultModifiers, Array.empty)
+		}
+		/** def foo: { bar: String } */
+		val fooMethod2 = {
+			val barMethod2 = new Def(Array.empty, strTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
+			new Def(Array.empty, simpleStructure(barMethod2), Array.empty, "foo", publicAccess, defaultModifiers, Array.empty)
+		}
+		val aClass1 = simpleClass("A", fooMethod1)
+		val aClass2 = simpleClass("A", fooMethod2)
+		val nameHashes1 = nameHashesForClass(aClass1)
+		val nameHashes2 = nameHashesForClass(aClass2)
+		// note that `bar` doesn't appear here because it's not treated as a definition
+		assertEquals(Set("A", "foo"), nameHashes1.regularMembers.map(_.name))
+		assertEquals(Set("A", "foo"), nameHashes2.regularMembers.map(_.name))
+		assertNameHashEqualForRegularName("A", nameHashes1, nameHashes2)
+		assertNameHashNotEqualForRegularName("foo", nameHashes1, nameHashes2)
+	}
+
+	private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashes,
+			nameHashes2: NameHashes): Unit = {
+		val nameHash1 = nameHashForRegularName(nameHashes1, name)
+		val nameHash2 = nameHashForRegularName(nameHashes1, name)
+		assertEquals(nameHash1, nameHash2)
+	}
+
+	private def assertNameHashNotEqualForRegularName(name: String, nameHashes1: NameHashes,
+			nameHashes2: NameHashes): Unit = {
+		val nameHash1 = nameHashForRegularName(nameHashes1, name)
+		val nameHash2 = nameHashForRegularName(nameHashes2, name)
+		assertNotEquals(nameHash1, nameHash2)
+	}
+
+	private def nameHashForRegularName(nameHashes: NameHashes, name: String): NameHash = {
+		nameHashes.regularMembers.find(_.name == name).get
+	}
+
+	private def nameHashesForClass(cl: ClassLike): NameHashes = {
+		val sourceAPI = new SourceAPI(Array.empty, Array(cl))
+		val nameHashing = new NameHashing
+		nameHashing.nameHashes(sourceAPI)
+	}
+
 	private def lzy[T](x: T): Lazy[T] = new Lazy[T] { def get: T = x }
 
 	private def simpleStructure(defs: Definition*) = new Structure(lzy(Array.empty[Type]), lzy(defs.toArray), lzy(Array.empty[Definition]))

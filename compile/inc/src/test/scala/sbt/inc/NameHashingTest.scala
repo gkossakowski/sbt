@@ -118,12 +118,6 @@ class NameHashingTest {
 		assertEquals(childNameHashA, childNameHashB)
 	}
 
-	/**
-	 * NameHash doesn't define equals() and hashCode() so if you want to compare
-	 * name hashes you need to map them to a tuple.
-	 */
-	private def convertToTuple(nameHash: NameHash): (String, Int) = (nameHash.name, nameHash.hash)
-
 	private def lzy[T](x: T): Lazy[T] = new Lazy[T] { def get: T = x }
 
 	private def simpleStructure(defs: Definition*) = new Structure(lzy(Array.empty[Type]), lzy(defs.toArray), lzy(Array.empty[Definition]))

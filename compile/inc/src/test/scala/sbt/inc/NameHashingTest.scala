@@ -26,8 +26,8 @@ class NameHashingTest {
 		val classB = simpleClass("Foo", nestedBar2, nestedBar1)
 		val api1 = new SourceAPI(Array.empty, Array(classA))
 		val api2 = new SourceAPI(Array.empty, Array(classB))
-		val nameHashes1 = nameHashing.nameHashes(api1).map(convertToTuple)
-		val nameHashes2 = nameHashing.nameHashes(api2).map(convertToTuple)
+		val nameHashes1 = nameHashing.nameHashes(api1)
+		val nameHashes2 = nameHashing.nameHashes(api2)
 		val def1Hash = HashAPI(def1)
 		val def2Hash = HashAPI(def2)
 		assertNotEquals(def1Hash, def2Hash)
@@ -66,8 +66,8 @@ class NameHashingTest {
 		}
 		val api1 = new SourceAPI(Array.empty, Array(classA))
 		val api2 = new SourceAPI(Array.empty, Array(classB))
-		val nameHashes1 = nameHashing.nameHashes(api1).map(convertToTuple)
-		val nameHashes2 = nameHashing.nameHashes(api2).map(convertToTuple)
+		val nameHashes1 = nameHashing.nameHashes(api1)
+		val nameHashes2 = nameHashing.nameHashes(api2)
 		assertNotEquals(nameHashes1, nameHashes2)
 	}
 
@@ -106,14 +106,16 @@ class NameHashingTest {
 		val parentApiB = new SourceAPI(Array.empty, Array(parentB))
 		val childApiA = new SourceAPI(Array.empty, Array(childA))
 		val childApiB = new SourceAPI(Array.empty, Array(childB))
-		val nameHashes1 = nameHashing.nameHashes(parentApiA).map(convertToTuple)
-		val nameHashes2 = nameHashing.nameHashes(parentApiB).map(convertToTuple)
-		assertEquals(Set("Parent"), nameHashes1.map(_._1))
-		assertEquals(Set("Parent", "bar"), nameHashes2.map(_._1))
+		val nameHashes1 = nameHashing.nameHashes(parentApiA)
+		val nameHashes2 = nameHashing.nameHashes(parentApiB)
+		assertEquals(Set("Parent"), nameHashes1.regularMembers.map(_.name))
+		assertEquals(Set("Parent", "bar"), nameHashes2.regularMembers.map(_.name))
 		assertNotEquals(nameHashes1, nameHashes2)
-		val nameHashes3 = nameHashing.nameHashes(childApiA).map(convertToTuple)
-		val nameHashes4 = nameHashing.nameHashes(childApiB).map(convertToTuple)
-		assertEquals(nameHashes3, nameHashes4)
+		val nameHashes3 = nameHashing.nameHashes(childApiA)
+		val nameHashes4 = nameHashing.nameHashes(childApiB)
+		val childNameHashA = nameHashes3.regularMembers.find(_.name == "Child").get
+		val childNameHashB = nameHashes4.regularMembers.find(_.name == "Child").get
+		assertEquals(childNameHashA, childNameHashB)
 	}
 
 	/**

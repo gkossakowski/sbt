@@ -28,7 +28,7 @@ class NameHashing {
 		val (implicitDefs, regularDefs) = apiPublicDefs.partition(_.definition.modifiers.isImplicit)
 		val implicitNameHashes = nameHashesForLocatedDefinitions(implicitDefs)
 		val regularNameHashes = nameHashesForLocatedDefinitions(regularDefs)
-		NameHashes(implicitNameHashes.toSet, regularNameHashes.toSet)
+		NameHashes(regularNameHashes.toSet, implicitNameHashes.toSet)
 	}
 
 	private def nameHashesForLocatedDefinitions(locatedDefs: Iterable[LocatedDefinition]): Iterable[NameHash] = {

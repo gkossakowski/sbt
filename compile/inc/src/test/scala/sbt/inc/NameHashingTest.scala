@@ -90,7 +90,6 @@ class NameHashingTest {
 	 */
 	@Test
 	def definitionInParentClass: Unit = {
-		val nameHashing = new NameHashing
 		val parentA = simpleClass("Parent")
 		val barMethod = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
 		val parentB = simpleClass("Parent", barMethod)
@@ -102,20 +101,14 @@ class NameHashingTest {
 			val structure = new Structure(lzy(Array[Type](parentB.structure)), lzy(Array.empty[Definition]), lzy(Array[Definition](barMethod)))
 			simpleClass("Child", structure)
 		}
-		val parentApiA = new SourceAPI(Array.empty, Array(parentA))
-		val parentApiB = new SourceAPI(Array.empty, Array(parentB))
-		val childApiA = new SourceAPI(Array.empty, Array(childA))
-		val childApiB = new SourceAPI(Array.empty, Array(childB))
-		val nameHashes1 = nameHashing.nameHashes(parentApiA)
-		val nameHashes2 = nameHashing.nameHashes(parentApiB)
-		assertEquals(Set("Parent"), nameHashes1.regularMembers.map(_.name))
-		assertEquals(Set("Parent", "bar"), nameHashes2.regularMembers.map(_.name))
-		assertNotEquals(nameHashes1, nameHashes2)
-		val nameHashes3 = nameHashing.nameHashes(childApiA)
-		val nameHashes4 = nameHashing.nameHashes(childApiB)
-		val childNameHashA = nameHashes3.regularMembers.find(_.name == "Child").get
-		val childNameHashB = nameHashes4.regularMembers.find(_.name == "Child").get
-		assertEquals(childNameHashA, childNameHashB)
+		val parentANameHashes = nameHashesForClass(parentA)
+		val parentBNameHashes = nameHashesForClass(parentB)
+		assertEquals(Set("Parent"), parentANameHashes.regularMembers.map(_.name))
+		assertEquals(Set("Parent", "bar"), parentBNameHashes.regularMembers.map(_.name))
+		assertNotEquals(parentANameHashes, parentBNameHashes)
+		val childANameHashes = nameHashesForClass(childA)
+		val childBNameHashes = nameHashesForClass(childB)
+		assertNameHashEqualForRegularName("Child", childANameHashes, childBNameHashes)
 	}
 
 	/**

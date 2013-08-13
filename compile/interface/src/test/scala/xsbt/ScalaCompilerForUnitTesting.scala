@@ -85,6 +85,7 @@ class ScalaCompilerForUnitTesting {
 		def api(sourceFile: File, source: xsbti.api.SourceAPI): Unit = {
 			apis(sourceFile) = source
 		}
+		def usedName(srcFile: File, name: String): Unit = ()
 		def problem(what: String, pos: Position, msg: String, severity: Severity, reported: Boolean): Unit = ()
 	}
 

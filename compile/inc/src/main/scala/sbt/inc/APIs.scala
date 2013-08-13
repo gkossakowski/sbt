@@ -7,6 +7,7 @@ package inc
 import xsbti.api.Source
 import java.io.File
 import APIs.getAPI
+import xsbti.api.NameHashes
 
 trait APIs
 {
@@ -16,12 +17,12 @@ trait APIs
 	/** The API for the external class `ext` at the time represented by this instance.
 	* This method returns an empty API if the file had no API or is not known to this instance. */
 	def externalAPI(ext: String): Source
-	
+
 	def allExternals: collection.Set[String]
 	def allInternalSources: collection.Set[File]
-	
+
 	def ++ (o: APIs): APIs
-	
+
 	def markInternalSource(src: File, api: Source): APIs
 	def markExternalAPI(ext: String, api: Source): APIs
 
@@ -36,10 +37,11 @@ object APIs
 {
 	def apply(internal: Map[File, Source], external: Map[String, Source]): APIs = new MAPIs(internal, external)
 	def empty: APIs = apply(Map.empty, Map.empty)
-	
+
 	val emptyAPI = new xsbti.api.SourceAPI(Array(), Array())
 	val emptyCompilation = new xsbti.api.Compilation(-1, Array())
-	val emptySource = new xsbti.api.Source(emptyCompilation, Array(), emptyAPI, 0, Array(), false)
+	val emptyNameHashes = new xsbti.api.NameHashes(Array.empty, Array.empty)
+	val emptySource = new xsbti.api.Source(emptyCompilation, Array(), emptyAPI, 0, emptyNameHashes, false)
 	def getAPI[T](map: Map[T, Source], src: T): Source = map.getOrElse(src, emptySource)
 }
 
@@ -47,22 +49,22 @@ private class MAPIs(val internal: Map[File, Source], val external: Map[String, S
 {
 	def allInternalSources: collection.Set[File] = internal.keySet
 	def allExternals: collection.Set[String] = external.keySet
-	
+
 	def ++ (o: APIs): APIs = new MAPIs(internal ++ o.internal, external ++ o.external)
-	
+
 	def markInternalSource(src: File, api: Source): APIs =
 		new MAPIs(internal.updated(src, api), external)
 
 	def markExternalAPI(ext: String, api: Source): APIs =
 		new MAPIs(internal, external.updated(ext, api))
-	
+
 	def removeInternal(remove: Iterable[File]): APIs = new MAPIs(internal -- remove, external)
 	def filterExt(keep: String => Boolean): APIs = new MAPIs(internal, external.filterKeys(keep))
-		
+
 	def groupBy[K](f: (File) => K, keepExternal: Map[K, String => Boolean]): Map[K, APIs] =
 		internal.groupBy(item => f(item._1)) map { group => (group._1, new MAPIs(group._2, external).filterExt(keepExternal.getOrElse(group._1, _ => false)))}
 
 	def internalAPI(src: File) = getAPI(internal, src)
 	def externalAPI(ext: String) = getAPI(external, ext)
-	
+
 }

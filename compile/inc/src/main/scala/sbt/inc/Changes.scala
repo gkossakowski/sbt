@@ -21,7 +21,24 @@ sealed abstract class APIChange[T](val modified: T)
  * are affecting its users or not. Therefore we err on the side of caution.
  */
 case class APIChangeDueToMacroDefinition[T](modified0: T) extends APIChange(modified0)
-case class SourceAPIChange[T](modified0: T, modifiedNames: Set[String]) extends APIChange(modified0)
+case class SourceAPIChange[T](modified0: T, namesWithModifiedHashes: NamesWithModifiedHashes) extends APIChange(modified0)
+
+case class NamesWithModifiedHashes(regularNames: Set[String], implicitNames: Set[String]) {
+	override def toString: String =
+		s"NamesWithModifiedHashes(regularNames = ${regularNames mkString ", "}, implicitNames = ${implicitNames mkString ", "})"
+}
+object NamesWithModifiedHashes {
+	def compareTwoNameHashes(a: NameHashes, b: NameHashes): NamesWithModifiedHashes = {
+		val modifiedRegularNames = calculateModifiedNames(a.regularMembers, b.regularMembers)
+		val modifiedImplicitNames = calculateModifiedNames(a.implicitMembers, b.implicitMembers)
+		NamesWithModifiedHashes(modifiedRegularNames, modifiedImplicitNames)
+	}
+	private def calculateModifiedNames(xs: Set[NameHash], ys: Set[NameHash]): Set[String] = {
+	  val differentNameHashes = (xs union ys) diff (xs intersect ys)
+	  differentNameHashes.map(_.name)
+	}
+}
+
 
 trait Changes[A]
 {

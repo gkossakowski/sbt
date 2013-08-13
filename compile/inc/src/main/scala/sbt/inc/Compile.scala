@@ -69,7 +69,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 
 	private[this] val apis = new HashMap[File, (Int, SourceAPI)]
 	private[this] val usedNames = new HashMap[File, Set[String]]
-	private[this] val publicNameHashes = new HashMap[File, scala.collection.immutable.Set[xsbti.api.NameHash]]
+	private[this] val publicNameHashes = new HashMap[File, NameHashes]
 	private[this] val unreporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val reporteds = new HashMap[File, ListBuffer[Problem]]
 	private[this] val binaryDeps = new HashMap[File, Set[File]]
@@ -169,7 +169,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			val hash = stamp match { case h: Hash => h.value; case _ => new Array[Byte](0) }
 			// TODO store this in Relations, rather than Source.
 			val hasMacro: Boolean = macroSources.contains(src)
-			val s = new xsbti.api.Source(compilation, hash, api._2, api._1, publicNameHashes(src).toArray, hasMacro)
+			val s = new xsbti.api.Source(compilation, hash, api._2, api._1, publicNameHashes(src).toXsbtiEquivalent, hasMacro)
 			val info = SourceInfos.makeInfo(getOrNil(reporteds, src), getOrNil(unreporteds, src))
 			val memberRefDeps = sourceDeps.getOrElse(src, Nil: Iterable[File])
 			val inheritanceDeps = inheritedSourceDeps.getOrElse(src, Nil: Iterable[File])

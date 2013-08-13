@@ -120,7 +120,7 @@ object Incremental
 					val apiUnifiedPatch = apiDiff.generateApiDiff(src.toString, oldApi.api, newApi.api, contextSize)
 					log.debug(s"Detected a change in a public API (${src.toString}):\n"
 					  + apiUnifiedPatch
-					  + s"\nModified names are: ${modifiedNames.mkString}")
+					  + s"\nModified names are: $modifiedNames")
 			}
 		} catch {
 			case e: ClassNotFoundException =>
@@ -167,8 +167,10 @@ object Incremental
 		if (SameAPI(a,b))
 			None
 		else {
-			val modifiedNames = calculateModifiedNameHashes(a.nameHashes, b.nameHashes)
-			val sourceApiChange = SourceAPIChange(src, modifiedNames)
+			val aNameHashes = NameHashes.fromXsbtiEquivalent(a.nameHashes)
+			val bNameHashes = NameHashes.fromXsbtiEquivalent(b.nameHashes)
+			val namesWithModifiedHashes = NamesWithModifiedHashes.compareTwoNameHashes(aNameHashes, bNameHashes)
+			val sourceApiChange = SourceAPIChange(src, namesWithModifiedHashes)
 			Some(sourceApiChange)
 		}
 	}
@@ -301,39 +303,39 @@ object Incremental
 	* included in a cycle with newly invalidated sources. */
 	private[this] def invalidateSources(changes: APIChanges[File], log: Logger, relations: Relations): Set[File] =
 	{
-//		log.debug("Invalidating by inheritance (transitively)...")
-//		val transitiveInheritance = transitiveDeps(initial, log)(inheritanceDeps)
-//		log.debug("Invalidated by transitive inheritance dependency: " + transitiveInheritance)
-//		val memberRef = transitiveInheritance flatMap memberRefDeps
-//		log.debug("Invalidated by member reference dependency: " + memberRef)
-//		val all = transitiveInheritance ++ memberRef
-//		all
-
-		val all = changes.apiChanges flatMap {
-			case APIChangeDueToMacroDefinition(modifiedSrcFile) =>
-				invalidateSource(relations, true, modifiedSrcFile, Set.empty, log)
-			case SourceAPIChange(modifiedSrcFile, changedNames) =>
-				invalidateSource(relations, false, modifiedSrcFile, changedNames, log)
+		val all = changes.apiChanges flatMap { apiChange =>
+			invalidateSource(relations, apiChange, log)
 		}
 		all.toSet
-		//includeInitialCond(initial, all, f => memberRefDeps(f) ++ inheritanceDeps(f), log)
 	}
 
-	private def invalidateSource(relations: Relations, modifiedDeclaresMacro: Boolean, modified: File, modifiedNames: Set[String], log: Logger): Set[File] = {
-		def reverse(r: Relations.SourceDependencies) = r.internal.reverse _
-		val inheritanceDeps = reverse(relations.inheritance)
-		log.debug("Invalidate source for " + modified)
-		log.debug("Invalidating by inheritance (transitively)...")
+	private def invalidateByInheritance(relations: Relations, modified: File, log: Logger): Set[File] = {
+		val inheritanceDeps = relations.inheritance.internal.reverse _
+		log.debug(s"Invalidating (transitively) by inheritance from $modified...")
 		val transitiveInheritance = transitiveDeps(Set(modified), log)(inheritanceDeps)
 		log.debug("Invalidated by transitive inheritance dependency: " + transitiveInheritance)
+		transitiveInheritance
+	}
+
+	private def invalidateSource(relations: Relations, apiChange: APIChange[File], log: Logger): Set[File] = {
+		def reverse(r: Relations.SourceDependencies) = r.internal.reverse _
+		val transitiveInheritance = invalidateByInheritance(relations, apiChange.modified, log)
 		val memberRefReversed = reverse(relations.memberRef)
-		log.debug("Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies. Only dependencies with following used names are considered: " + modifiedNames)
-		val memberRefDeps = if (modifiedDeclaresMacro) {
-			log.debug("The following source file declares the macro, all direct dependencies are invalidated: " + modified)
-			memberRefReversed
-		} else {
-			new NameHashFilteredDependencies2(relations.names, memberRefReversed, modifiedNames, log)
+
+		val memberRefDeps = apiChange match {
+			case APIChangeDueToMacroDefinition(modifiedSrcFile) =>
+				log.debug(s"The $modifiedSrcFile source file declares the macro. All direct dependencies are invalidated.")
+				memberRefReversed
+			case SourceAPIChange(modifiedSrcFile, changedNames) if !changedNames.implicitNames.isEmpty =>
+				log.debug(s"The $modifiedSrcFile source file has the following implicit definitions changed:" +
+						  s"${changedNames.implicitNames.mkString(", ")}. All direct dependencies are invalidated.")
+				memberRefReversed
+			case SourceAPIChange(modifiedSrcFile, changedNames) =>
+				log.debug("Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies." +
+						  s"Only dependencies with following used names are considered: ${changedNames.regularNames}")
+				new NameHashFilteredDependencies2(relations.names, memberRefReversed, changedNames.regularNames, log)
 		}
+
 		val memberRef = transitiveInheritance flatMap memberRefDeps
 		val all = transitiveInheritance ++ memberRef
 		all

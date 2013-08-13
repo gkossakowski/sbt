@@ -23,20 +23,28 @@ class NameHashing {
 	 * NOTE: The hashing sum used for hashing a group of definition is insensitive
 	 * to order of definitions.
 	 */
-	def nameHashes(source: SourceAPI): Set[xsbti.api.NameHash] = {
+	def nameHashes(source: SourceAPI): NameHashes = {
 		val apiPublicDefs = publicDefs(source)
-		def hashLocatedDefinitions(locatedDefs: Set[LocatedDefinition]): Int = {
-			val defsWithExtraHashes = locatedDefs.toSeq.map(ld => ld.definition -> ld.location.hashCode)
-			val hashAPI = new xsbt.api.HashAPI(false, true, false)
-			hashAPI.hashDefinitionsWithExtraHashes(defsWithExtraHashes)
-			hashAPI.finalizeHash
-		}
-		val groupedApiPublicDefs = apiPublicDefs.groupBy(locatedDef => localName(locatedDef.definition.name))
-		val publicDefsHashes = groupedApiPublicDefs.mapValues(hashLocatedDefinitions)
-		publicDefsHashes.toSeq.map({case (name: String, hash: Int) => new xsbti.api.NameHash(name, hash) }).toSet
+		val (implicitDefs, regularDefs) = apiPublicDefs.partition(_.definition.modifiers.isImplicit)
+		val implicitNameHashes = nameHashesForLocatedDefinitions(implicitDefs)
+		val regularNameHashes = nameHashesForLocatedDefinitions(regularDefs)
+		NameHashes(implicitNameHashes.toSet, regularNameHashes.toSet)
 	}
 
-	private def publicDefs(source: SourceAPI): Set[LocatedDefinition] = {
+	private def nameHashesForLocatedDefinitions(locatedDefs: Iterable[LocatedDefinition]): Iterable[NameHash] = {
+		val groupedBySimpleName = locatedDefs.groupBy(locatedDef => localName(locatedDef.definition.name))
+		val hashes = groupedBySimpleName.mapValues(hashLocatedDefinitions)
+		hashes.toIterable.map({ case (name: String, hash: Int) => NameHash(name, hash) })
+	}
+
+	private def hashLocatedDefinitions(locatedDefs: Iterable[LocatedDefinition]): Int = {
+		val defsWithExtraHashes = locatedDefs.toSeq.map(ld => ld.definition -> ld.location.hashCode)
+		val hashAPI = new xsbt.api.HashAPI(false, true, false)
+		hashAPI.hashDefinitionsWithExtraHashes(defsWithExtraHashes)
+		hashAPI.finalizeHash
+	}
+
+	private def publicDefs(source: SourceAPI): Iterable[LocatedDefinition] = {
 		val locatedDefs = scala.collection.mutable.Buffer[LocatedDefinition]()
 		val visitedDefs =  scala.collection.mutable.Set[Definition]()
 		var currentLocation: Location = Location()

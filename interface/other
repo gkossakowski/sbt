@@ -3,8 +3,12 @@ Source
 	hash: Byte*
 	api: SourceAPI
 	apiHash: Int
-	nameHashes: NameHash*
+	nameHashes: NameHashes
 	hasMacro: Boolean
+
+NameHashes
+	regularMembers: NameHash*
+	implicitMembers: NameHash*
 
 NameHash
 	name: String

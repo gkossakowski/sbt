@@ -8,6 +8,8 @@
 	import Licensed._
 	import Scope.ThisScope
 	import LaunchProguard.{proguard, Proguard}
+	import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys
+	import com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseCreateSrc
 
 object Sbt extends Build
 {
@@ -23,7 +25,13 @@ object Sbt extends Build
 		resolvers += Resolver.typesafeIvyRepo("releases"),
 		concurrentRestrictions in Global += Util.testExclusiveRestriction,
 		testOptions += Tests.Argument(TestFrameworks.ScalaCheck, "-w", "1"),
-		javacOptions in compile ++= Seq("-target", "6", "-source", "6", "-Xlint", "-Xlint:-serial")
+		javacOptions in compile ++= Seq("-target", "6", "-source", "6", "-Xlint", "-Xlint:-serial"),
+		// do not add test source files to generated `.classpath` file
+		// we have to exclude test files because Eclipse has only one classpath per project
+		// which makes it fail to resolve class definitions correctly because classes defined
+		// in tests overshadow classes defined in dependent projects
+		EclipseKeys.createSrc in Test := EclipseCreateSrc.ValueSet.empty,
+		EclipseKeys.createSrc in Compile := EclipseCreateSrc.Default + EclipseCreateSrc.Managed
 	)
 
 	lazy val myProvided = config("provided") intransitive;

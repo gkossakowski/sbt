@@ -4,6 +4,7 @@ import xsbti.api.SourceAPI
 import xsbti.api.Definition
 import xsbti.api.DefinitionType
 import xsbti.api.ClassLike
+import xsbt.api.Visit
 
 /**
  * A class that computes hashes for each group of definitions grouped by a simple name.
@@ -44,36 +45,40 @@ class NameHashing {
 		hashAPI.finalizeHash
 	}
 
-	private def publicDefs(source: SourceAPI): Iterable[LocatedDefinition] = {
+	private class ExtractPublicDefinitions extends Visit {
 		val locatedDefs = scala.collection.mutable.Buffer[LocatedDefinition]()
-		val visitedDefs =  scala.collection.mutable.Set[Definition]()
-		var currentLocation: Location = Location()
-		def extractAllNestedDefs(deff: Definition): Unit = {
-			val locatedDef = LocatedDefinition(currentLocation, deff)
-			if (!visitedDefs.contains(deff)) {
-				locatedDefs += locatedDef
-				visitedDefs += deff
-				deff match {
-					case cl: xsbti.api.ClassLike =>
-						val savedLocation = currentLocation
-						currentLocation = classLikeAsLocation(currentLocation, cl)
-						cl.structure().declared().foreach(extractAllNestedDefs)
-						cl.structure().inherited().foreach(extractAllNestedDefs)
-						currentLocation = savedLocation
-					case _ => ()
+		private var currentLocation: Location = Location()
+		override def visitAPI(s: SourceAPI): Unit = {
+			s.packages foreach visitPackage
+			s.definitions foreach { case topLevelDef: ClassLike =>
+				val packageName = {
+					val fullName = topLevelDef.name()
+					val lastDotIndex = fullName.lastIndexOf('.')
+					if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex-1)
 				}
+				currentLocation = packageAsLocation(packageName)
+				visitDefinition(topLevelDef)
 			}
 		}
-		source.definitions.foreach { case topLevelDef: ClassLike =>
-			val packageName = {
-				val fullName = topLevelDef.name()
-				val lastDotIndex = fullName.lastIndexOf('.')
-				if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex-1)
+		override def visitDefinition(d: Definition): Unit = {
+			val locatedDef = LocatedDefinition(currentLocation, d)
+			locatedDefs += locatedDef
+			d match {
+				case cl: xsbti.api.ClassLike =>
+					val savedLocation = currentLocation
+					currentLocation = classLikeAsLocation(currentLocation, cl)
+					super.visitDefinition(d)
+					currentLocation = savedLocation
+				case _ =>
+					super.visitDefinition(d)
 			}
-			currentLocation = packageAsLocation(packageName)
-			extractAllNestedDefs(topLevelDef)
 		}
-		locatedDefs.toSet
+	}
+
+	private def publicDefs(source: SourceAPI): Iterable[LocatedDefinition] = {
+		val visitor = new ExtractPublicDefinitions
+		visitor.visitAPI(source)
+		visitor.locatedDefs
 	}
 
 	private def localName(name: String): String = {

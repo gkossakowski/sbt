@@ -143,11 +143,12 @@ class NameHashingTest {
 		val aClass2 = simpleClass("A", fooMethod2)
 		val nameHashes1 = nameHashesForClass(aClass1)
 		val nameHashes2 = nameHashesForClass(aClass2)
-		// note that `bar` doesn't appear here because it's not treated as a definition
-		assertEquals(Set("A", "foo"), nameHashes1.regularMembers.map(_.name))
-		assertEquals(Set("A", "foo"), nameHashes2.regularMembers.map(_.name))
+		// note that `bar` does appear here
+		assertEquals(Set("A", "foo", "bar"), nameHashes1.regularMembers.map(_.name))
+		assertEquals(Set("A", "foo", "bar"), nameHashes2.regularMembers.map(_.name))
 		assertNameHashEqualForRegularName("A", nameHashes1, nameHashes2)
 		assertNameHashNotEqualForRegularName("foo", nameHashes1, nameHashes2)
+		assertNameHashNotEqualForRegularName("bar", nameHashes1, nameHashes2)
 	}
 
 	private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashes,

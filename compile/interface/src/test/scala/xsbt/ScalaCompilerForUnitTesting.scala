@@ -22,7 +22,18 @@ class ScalaCompilerForUnitTesting {
 	 * Compiles given source code using Scala compiler and returns API representation
 	 * extracted by ExtractAPI class.
 	 */
-	def compileSrc(src: String): SourceAPI = {
+	def extractApiFromSrc(src: String): SourceAPI = {
+		val (tempSrcFile, analysisCallback) = compileSrc(src)
+		analysisCallback.apis(tempSrcFile)
+	}
+
+	/**
+	 * Compiles given source code written to a temporary file.
+	 *
+	 * Both the temporary source file and analysis callback are returned as
+	 * a result.
+	 */
+	private def compileSrc(src: String): (File, RecordingAnalysisCallback) = {
 		import java.io.FileWriter
 		withTemporaryDirectory { temp =>
 			val analysisCallback = new RecordingAnalysisCallback
@@ -36,7 +47,7 @@ class ScalaCompilerForUnitTesting {
 			fw.write(src)
 			fw.close()
 			run.compile(List(srcFile.getAbsolutePath()))
-			analysisCallback.apis(srcFile)
+			(srcFile, analysisCallback)
 		}
 	}
 

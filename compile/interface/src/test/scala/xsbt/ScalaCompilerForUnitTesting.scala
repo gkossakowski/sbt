@@ -27,6 +27,11 @@ class ScalaCompilerForUnitTesting {
 		analysisCallback.apis(tempSrcFile)
 	}
 
+	def extractUsedNamesFromSrc(src: String): Set[String] = {
+		val (tempSrcFile, analysisCallback) = compileSrc(src)
+		analysisCallback.usedNames(tempSrcFile).toSet
+	}
+
 	/**
 	 * Compiles given source code written to a temporary file.
 	 *
@@ -87,7 +92,9 @@ class ScalaCompilerForUnitTesting {
 	}
 
 	private class RecordingAnalysisCallback extends AnalysisCallback {
-		val apis: scala.collection.mutable.Map[File, SourceAPI] = scala.collection.mutable.Map.empty
+		import scala.collection.mutable.{Map, Set}
+		val apis: Map[File, SourceAPI] = scala.collection.mutable.Map.empty
+		val usedNames: Map[File, Set[String]] = Map.empty
 		def beginSource(source: File): Unit = ()
 		def sourceDependency(dependsOn: File, source: File, publicInherited: Boolean): Unit = ()
 		def binaryDependency(binary: File, name: String, source: File, publicInherited: Boolean): Unit = ()
@@ -96,7 +103,10 @@ class ScalaCompilerForUnitTesting {
 		def api(sourceFile: File, source: xsbti.api.SourceAPI): Unit = {
 			apis(sourceFile) = source
 		}
-		def usedName(srcFile: File, name: String): Unit = ()
+		def usedName(srcFile: File, name: String): Unit = {
+			val usedNamesInSrcFile = usedNames.getOrElseUpdate(srcFile, Set.empty)
+			usedNamesInSrcFile += name
+		}
 		def problem(what: String, pos: Position, msg: String, severity: Severity, reported: Boolean): Unit = ()
 	}
 

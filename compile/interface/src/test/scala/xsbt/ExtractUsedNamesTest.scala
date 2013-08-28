@@ -27,6 +27,8 @@ class ExtractUsedNamesTest {
 				"scala", "AnyRef",
 				// class A receives default constructor which is internally called "<init>"
 				"<init>",
+				// coming from CompilationUnit.depends
+				"Object",
 				"b")
 		assertEquals(expectedNames, usedNames)
 	}

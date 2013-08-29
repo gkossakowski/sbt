@@ -18,7 +18,11 @@ class NameHashFilteredDependencies2(
 	}
 
 	private def filteredDependencies(dependent: Set[File]) = {
-		dependent.filter { from: java.io.File =>
+		dependent.filter {
+			case from if fileExtension(from) == "java" =>
+				log.debug(s"Name hashing optimization doesn't apply to Java dependency: $from")
+				true
+			case from =>
 				val usedNamesInDependent = usedNames(from)
 				val modifiedAndUsedNames = modifiedNames intersect usedNamesInDependent
 				if (modifiedAndUsedNames.isEmpty) {
@@ -28,9 +32,17 @@ class NameHashFilteredDependencies2(
 					log.debug("The following modified names cause invalidation of %s: %s".format(from, modifiedAndUsedNames))
 					true
 				}
-			}
+		}
 	}
 
 	private def usedNames(from: File): Set[String] = names.forward(from)
+
+	/** Returns file name extenstion or empty string if passed file doesn't have an extenstion */
+	private def fileExtension(file: File): String = {
+		val name = file.getName
+		val lastDotIndex = name.lastIndexOf('.')
+		val extension = if (lastDotIndex == -1) "" else name.substring(lastDotIndex+1)
+		extension
+	}
 
 }

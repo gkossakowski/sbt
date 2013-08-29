@@ -41,7 +41,12 @@ final case class IncOptions(
 	*/
 	apiDumpDirectory: Option[java.io.File],
 	/** Creates a new ClassfileManager that will handle class file deletion and addition during a single incremental compilation run. */
-	newClassfileManager: () => ClassfileManager
+	newClassfileManager: () => ClassfileManager,
+	/**
+	 * Determines whether incremental compiler should recompile all dependencies of a file
+	 * that contains a macro definition.
+	 */
+	recompileOnMacroDef: Boolean
 )
 
 object IncOptions {
@@ -55,7 +60,8 @@ object IncOptions {
 		apiDebug = false,
 		apiDiffContextSize = 5,
 		apiDumpDirectory = None,
-		newClassfileManager = ClassfileManager.deleteImmediately
+		newClassfileManager = ClassfileManager.deleteImmediately,
+		recompileOnMacroDef = false
 	)
 	def defaultTransactional(tempDir: File): IncOptions = setTransactional(Default, tempDir)
 	def setTransactional(opts: IncOptions, tempDir: File): IncOptions =
@@ -66,7 +72,8 @@ object IncOptions {
 	val relationsDebugKey       = "relationsDebug"
 	val apiDebugKey             = "apiDebug"
 	val apiDumpDirectoryKey     = "apiDumpDirectory"
-	val apiDiffContextSize      = "apiDiffContextSize"
+	val apiDiffContextSizeKey   = "apiDiffContextSize"
+	val recompileOnMacroDefKey  = "recompileOnMacroDefKey"
 
 	def fromStringMap(m: java.util.Map[String, String]): IncOptions = {
 		// all the code below doesn't look like idiomatic Scala for a good reason: we are working with Java API
@@ -87,7 +94,7 @@ object IncOptions {
 			if (m.containsKey(k)) m.get(k).toBoolean else Default.apiDebug
 		}
 		def getApiDiffContextSize: Int = {
-			val k = apiDiffContextSize
+			val k = apiDiffContextSizeKey
 			if (m.containsKey(k)) m.get(k).toInt else Default.apiDiffContextSize
 		}
 		def getApiDumpDirectory: Option[java.io.File] = {
@@ -96,9 +103,13 @@ object IncOptions {
 				Some(new java.io.File(m.get(k)))
 			else None
 		}
+		def getRecompileOnMacroDef: Boolean = {
+			val k = recompileOnMacroDefKey
+			if (m.containsKey(k)) m.get(k).toBoolean else Default.recompileOnMacroDef
+		}
 
 		IncOptions(getTransitiveStep, getRecompileAllFraction, getRelationsDebug, getApiDebug, getApiDiffContextSize,
-			getApiDumpDirectory, ClassfileManager.deleteImmediately)
+			getApiDumpDirectory, ClassfileManager.deleteImmediately, getRecompileOnMacroDef)
 	}
 
 	def toStringMap(o: IncOptions): java.util.Map[String, String] = {
@@ -108,7 +119,7 @@ object IncOptions {
 		m.put(relationsDebugKey, o.relationsDebug.toString)
 		m.put(apiDebugKey, o.apiDebug.toString)
 		o.apiDumpDirectory.foreach(f => m.put(apiDumpDirectoryKey, f.toString))
-		m.put(apiDiffContextSize, o.apiDiffContextSize.toString)
+		m.put(apiDiffContextSizeKey, o.apiDiffContextSize.toString)
 		m
 	}
 }

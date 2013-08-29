@@ -331,8 +331,9 @@ object Incremental
 						  s"${changedNames.implicitNames.mkString(", ")}. All direct dependencies are invalidated.")
 				memberRefReversed
 			case SourceAPIChange(modifiedSrcFile, changedNames) =>
-				log.debug("Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies." +
-						  s"Only dependencies with following used names are considered: ${changedNames.regularNames}")
+				log.debug("Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies.\n" +
+						  s"Scala dependencies with following used names are considered: ${changedNames.regularNames}.\n" +
+                          "All Java dependencies are considered.")
 				new NameHashFilteredDependencies2(relations.names, memberRefReversed, changedNames.regularNames, log)
 		}
 

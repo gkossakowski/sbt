@@ -659,6 +659,7 @@ object Defaults extends BuildCommon
 	def docSetting(key: TaskKey[File]) = docTaskSettings(key)
 	def docTaskSettings(key: TaskKey[File] = doc): Seq[Setting[_]] = inTask(key)(Seq(
 		apiMappings ++= { if(autoAPIMappings.value) APIMappings.extract(dependencyClasspath.value, streams.value.log).toMap else Map.empty[File,URL] },
+		fileInputOptions := Seq("-doc-root-content", "-diagrams-dot-path"),
 		key in TaskGlobal := {
 			val s = streams.value
 			val cs = compilers.value
@@ -671,13 +672,14 @@ object Defaults extends BuildCommon
 			val hasJava = srcs.exists(_.name.endsWith(".java"))
 			val cp = data(dependencyClasspath.value).toList
 			val label = nameForSrc(configuration.value.name)
+			val fiOpts = fileInputOptions.value
 			val (options, runDoc) =
 				if(hasScala)
 					(sOpts ++ Opts.doc.externalAPI(xapis), // can't put the .value calls directly here until 2.10.2
-						Doc.scaladoc(label, s.cacheDirectory / "scala", cs.scalac.onArgs(exported(s, "scaladoc"))))
+						Doc.scaladoc(label, s.cacheDirectory / "scala", cs.scalac.onArgs(exported(s, "scaladoc")), fiOpts))
 				else if(hasJava)
 					(jOpts,
-						Doc.javadoc(label, s.cacheDirectory / "java", cs.javac.onArgs(exported(s, "javadoc"))))
+						Doc.javadoc(label, s.cacheDirectory / "java", cs.javac.onArgs(exported(s, "javadoc")), fiOpts))
 				else
 					(Nil, RawCompileLike.nop)
 			runDoc(srcs, cp, out, options, maxErrors.value, s.log)
@@ -1349,6 +1351,7 @@ object Classpaths
 
 	lazy val typesafeReleases = Resolver.typesafeIvyRepo("releases")
 	lazy val typesafeSnapshots = Resolver.typesafeIvyRepo("snapshots")
+
 	@deprecated("Use `typesafeReleases` instead", "0.12.0")
 	lazy val typesafeResolver = typesafeReleases
 	@deprecated("Use `Resolver.typesafeIvyRepo` instead", "0.12.0")
@@ -1422,7 +1425,7 @@ object Classpaths
 	@deprecated("Directly provide the jar files per Scala version.", "0.13.0")
 	def substituteScalaFiles(scalaInstance: ScalaInstance, scalaOrg: String, report: UpdateReport): UpdateReport =
 		substituteScalaFiles(scalaOrg, report)(const(scalaInstance.jars))
-		
+
 	def substituteScalaFiles(scalaOrg: String, report: UpdateReport)(scalaJars: String => Seq[File]): UpdateReport =
 		report.substitute { (configuration, module, arts) =>
 			if(module.organization == scalaOrg) {
@@ -1459,13 +1462,21 @@ object Classpaths
 		try { ivyRepo.mavenCompatible }
 		catch { case _: NoSuchMethodError => false }
 
+	private[this] def skipConsistencyCheck(ivyRepo: xsbti.IvyRepository): Boolean =
+		try { ivyRepo.skipConsistencyCheck }
+		catch { case _: NoSuchMethodError => false }
+
+	private[this] def descriptorOptional(ivyRepo: xsbti.IvyRepository): Boolean =
+		try { ivyRepo.descriptorOptional }
+		catch { case _: NoSuchMethodError => false }
+
 	private[this] def bootRepository(repo: xsbti.Repository): Resolver =
 	{
 		import xsbti.Predefined
 		repo match
 		{
 			case m: xsbti.MavenRepository => MavenRepository(m.id, m.url.toString)
-			case i: xsbti.IvyRepository => Resolver.url(i.id, i.url)(Patterns(i.ivyPattern :: Nil, i.artifactPattern :: Nil, mavenCompatible(i)))
+			case i: xsbti.IvyRepository => Resolver.url(i.id, i.url)(Patterns(i.ivyPattern :: Nil, i.artifactPattern :: Nil, mavenCompatible(i), descriptorOptional(i), skipConsistencyCheck(i)))
 			case p: xsbti.PredefinedRepository => p.id match {
 				case Predefined.Local => Resolver.defaultLocal
 				case Predefined.MavenLocal => Resolver.mavenLocal
@@ -1496,24 +1507,37 @@ trait BuildExtra extends BuildCommon
 		def compose(setting: SettingKey[State => State], f: State => State) = setting in Global ~= (_ compose f)
 		Seq( compose(onLoad, add), compose(onUnload, remove) )
 	}
+
+	/** Adds `dependency` as an sbt plugin for the specific sbt version `sbtVersion` and Scala version `scalaVersion`.
+	* Typically, use the default values for these versions instead of specifying them explicitly. */
 	def addSbtPlugin(dependency: ModuleID, sbtVersion: String, scalaVersion: String): Setting[Seq[ModuleID]] =
 		libraryDependencies += sbtPluginExtra(dependency, sbtVersion, scalaVersion)
+
+	/** Adds `dependency` as an sbt plugin for the specific sbt version `sbtVersion`.
+	* Typically, use the default value for this version instead of specifying it explicitly. */
 	def addSbtPlugin(dependency: ModuleID, sbtVersion: String): Setting[Seq[ModuleID]] =
 		libraryDependencies <+= (scalaBinaryVersion in update) { scalaV => sbtPluginExtra(dependency, sbtVersion, scalaV) }
+
+	/** Adds `dependency` as an sbt plugin for the sbt and Scala versions configured by
+	* `sbtBinaryVersion` and `scalaBinaryVersion` scoped to `update`. */
 	def addSbtPlugin(dependency: ModuleID): Setting[Seq[ModuleID]] =
 		libraryDependencies <+= (sbtBinaryVersion in update,scalaBinaryVersion in update) { (sbtV, scalaV) => sbtPluginExtra(dependency, sbtV, scalaV) }
 
+	/** Transforms `dependency` to be in the auto-compiler plugin configuration. */
 	def compilerPlugin(dependency: ModuleID): ModuleID =
 		dependency.copy(configurations = Some("plugin->default(compile)"))
 
+	/** Adds `dependency` to `libraryDependencies` in the auto-compiler plugin configuration. */
 	def addCompilerPlugin(dependency: ModuleID): Setting[Seq[ModuleID]] =
 		libraryDependencies += compilerPlugin(dependency)
 
+	/** Constructs a setting that declares a new artifact `a` that is generated by `taskDef`. */
 	def addArtifact(a: Artifact, taskDef: TaskKey[File]): SettingsDefinition =
 	{
 		val pkgd = packagedArtifacts := packagedArtifacts.value updated (a, taskDef.value)
 		seq( artifacts += a, pkgd )
 	}
+	/** Constructs a setting that declares a new artifact `artifact` that is generated by `taskDef`. */
 	def addArtifact(artifact: Initialize[Artifact], taskDef: Initialize[Task[File]]): SettingsDefinition =
 	{
 		val artLocal = SettingKey.local[Artifact]
@@ -1588,20 +1612,27 @@ trait BuildCommon
 	def inputTask[T](f: TaskKey[Seq[String]] => Initialize[Task[T]]): Initialize[InputTask[T]] =
 		InputTask.apply(Def.value((s: State) => Def.spaceDelimited()))(f)
 
+	/** Allows a String to be used where a `NameFilter` is expected.
+	* Asterisks (`*`) in the string are interpreted as wildcards.
+	* All other characters must match exactly.  See [[sbt.GlobFilter]]. */
 	implicit def globFilter(expression: String): NameFilter = GlobFilter(expression)
+
 	implicit def richAttributed(s: Seq[Attributed[File]]): RichAttributed = new RichAttributed(s)
 	implicit def richFiles(s: Seq[File]): RichFiles = new RichFiles(s)
 	implicit def richPathFinder(s: PathFinder): RichPathFinder = new RichPathFinder(s)
 	final class RichPathFinder private[sbt](s: PathFinder)
 	{
+		/** Converts the `PathFinder` to a `Classpath`, which is an alias for `Seq[Attributed[File]]`. */
 		def classpath: Classpath = Attributed blankSeq s.get
 	}
 	final class RichAttributed private[sbt](s: Seq[Attributed[File]])
 	{
+		/** Extracts the plain `Seq[File]` from a Classpath (which is a `Seq[Attributed[File]]`).*/
 		def files: Seq[File] = Attributed.data(s)
 	}
 	final class RichFiles private[sbt](s: Seq[File])
 	{
+		/** Converts the `Seq[File]` to a Classpath, which is an alias for `Seq[Attributed[File]]`. */
 		def classpath: Classpath = Attributed blankSeq s
 	}
 	def toError(o: Option[String]): Unit = o foreach error

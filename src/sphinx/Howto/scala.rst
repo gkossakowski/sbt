@@ -2,8 +2,6 @@
  Configure and use Scala
 =========================
 
-By default, sbt's interactive mode is started when no commands are provided on the command line or when the `shell` command is invoked.
-
 .. howto::
    :id: version
    :title: Set the Scala version used for building the project
@@ -118,6 +116,29 @@ The `consoleProject` command is configured separately by `initialCommands in con
 ::
 
     initialCommands in consoleProject := """println("Hello from consoleProject")"""
+
+
+.. howto::
+   :id: cleanup
+   :title: Define the commands evaluated when exiting the Scala REPL
+   :type: setting
+   
+   cleanupCommands in console := """println("Bye!")"""
+
+Set `cleanupCommands in console` to set the statements to evaluate after exiting the Scala REPL started by `console` and `consoleQuick`.  To configure `consoleQuick` separately, use `cleanupCommands in consoleQuick`.
+For example,
+
+::
+
+    cleanupCommands in console := """println("Bye from console")"""
+
+    cleanupCommands in consoleQuick := """println("Bye from consoleQuick")"""
+
+The `consoleProject` command is configured separately by `cleanupCommands in consoleProject`.  It does not use the value from `cleanupCommands in console` by default.  For example,
+
+::
+
+    cleanupCommands in consoleProject := """println("Bye from consoleProject")"""
 
 
 .. howto::

@@ -45,6 +45,7 @@ final class API(val global: CallbackGlobal) extends Compat
 			traverser.apply(unit.body)
 			val extractUsedNames = new ExtractUsedNames[global.type](global)
 			val names = extractUsedNames.extract(unit)
+			debug("The " + sourceFile + " contains the following used names " + names)
 			names foreach { (name: String) => callback.usedName(sourceFile, name) }
 			val packages = traverser.packages.toArray[String].map(p => new xsbti.api.Package(p))
 			val source = new xsbti.api.SourceAPI(packages, traverser.definitions.toArray[xsbti.api.Definition])

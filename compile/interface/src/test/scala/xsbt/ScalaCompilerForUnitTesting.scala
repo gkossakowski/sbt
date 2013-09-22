@@ -23,37 +23,60 @@ class ScalaCompilerForUnitTesting {
 	 * extracted by ExtractAPI class.
 	 */
 	def extractApiFromSrc(src: String): SourceAPI = {
-		val (tempSrcFile, analysisCallback) = compileSrc(src)
+		val (Seq(tempSrcFile), analysisCallback) = compileSrcs(src)
 		analysisCallback.apis(tempSrcFile)
 	}
 
 	def extractUsedNamesFromSrc(src: String): Set[String] = {
-		val (tempSrcFile, analysisCallback) = compileSrc(src)
+		val (Seq(tempSrcFile), analysisCallback) = compileSrcs(src)
 		analysisCallback.usedNames(tempSrcFile).toSet
 	}
 
 	/**
-	 * Compiles given source code written to a temporary file.
+	 * Extract used names from src provided as the second argument.
 	 *
-	 * Both the temporary source file and analysis callback are returned as
-	 * a result.
+	 * The purpose of the first argument is to define names that the second
+	 * source is going to refer to. Both files are compiled in the same compiler
+	 * Run but only names used in the second src file are returned.
 	 */
-	private def compileSrc(src: String): (File, RecordingAnalysisCallback) = {
-		import java.io.FileWriter
+	def extractUsedNamesFromSrc(definitionSrc: String, actualSrc: String): Set[String] = {
+		// we drop temp src file corresponding to the definition src file
+		val (Seq(_, tempSrcFile), analysisCallback) = compileSrcs(definitionSrc, actualSrc)
+		analysisCallback.usedNames(tempSrcFile).toSet
+	}
+
+	/**
+	 * Compiles given source code snippets written to a temporary files. Each snippet is
+	 * written to a separate temporary file.
+	 *
+	 * The sequence of temporary files corresponding to passed snippets and analysis
+	 * callback is returned as a result.
+	 */
+	private def compileSrcs(srcs: String*): (Seq[File], RecordingAnalysisCallback) = {
 		withTemporaryDirectory { temp =>
 			val analysisCallback = new RecordingAnalysisCallback
 			val classesDir = new File(temp, "classes")
 			classesDir.mkdir()
 			val compiler = prepareCompiler(classesDir, analysisCallback)
 			val run = new compiler.Run
-			val srcFile = new File(temp, "Test.scala")
-			srcFile.createNewFile()
-			val fw = new FileWriter(srcFile)
-			fw.write(src)
-			fw.close()
-			run.compile(List(srcFile.getAbsolutePath()))
-			(srcFile, analysisCallback)
+			val srcFiles = srcs.toSeq.zipWithIndex map { case (src, i) =>
+				val fileName = s"Test_$i.scala"
+				prepareSrcFile(temp, fileName, src)
+			}
+			val srcFilePaths = srcFiles.map(srcFile => srcFile.getAbsolutePath).toList
+			run.compile(srcFilePaths)
+			(srcFiles, analysisCallback)
 		}
+	}
+
+	private def prepareSrcFile(baseDir: File, fileName: String, src: String): File = {
+		import java.io.FileWriter
+		val srcFile = new File(baseDir, fileName)
+		srcFile.createNewFile()
+		val fw = new FileWriter(srcFile)
+		fw.write(src)
+		fw.close()
+		srcFile
 	}
 
 	private def prepareCompiler(outputDir: File, analysisCallback: AnalysisCallback): CachedCompiler0#Compiler = {

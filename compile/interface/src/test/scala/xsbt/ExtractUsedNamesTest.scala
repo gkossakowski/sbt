@@ -23,7 +23,6 @@ class ExtractUsedNamesTest {
 		"<init>",
 		// AnyRef is dealiased into Object
 		"Object")
-
 	@Test
 	def importedName: Unit = {
 		val src = """

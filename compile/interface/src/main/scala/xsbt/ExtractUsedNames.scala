@@ -20,7 +20,11 @@ class ExtractUsedNames[GlobalType <: CallbackGlobal](val global: GlobalType) {
 
 	private def extractByTreeWalk(tree: Tree, sourceFile: io.AbstractFile): Set[String] = {
 		val namesBuffer = collection.mutable.ListBuffer.empty[String]
-		tree foreach {
+		def addSymbol(symbol: Symbol): Unit = {
+			val symbolNameAsString = symbol.name.toString
+			namesBuffer += symbolNameAsString
+		}
+		def handleTreeNode(node: Tree): Unit = node match {
 			case _: DefTree | _: Template => ()
 			// turns out that Import node has a TermSymbol associated with it
 			// I (Grzegorz) tried to understand why it's there and what does it represent but
@@ -33,10 +37,18 @@ class ExtractUsedNames[GlobalType <: CallbackGlobal](val global: GlobalType) {
 					usedNameInImportSelector(selector.name)
 					usedNameInImportSelector(selector.rename)
 				}
+			// TODO: figure out whether we should process the original tree or walk the type
+			// the argument for processing the original tree: we process what user wrote
+			// the argument for processing the type: we catch all transformations that typer applies
+			// to types but that might be a bad thing because it might expand aliases eagerly which
+			// not what we need
+			case t: TypeTree if t.original != null =>
+				t.original.foreach(handleTreeNode)
 			case t if t.hasSymbol && eligibleAsUsedName(t.symbol, sourceFile) =>
-				namesBuffer += t.symbol.name.toString
+				addSymbol(t.symbol)
 			case _ => ()
 		}
+		tree.foreach(handleTreeNode)
 		namesBuffer.toSet
 	}
 

@@ -23,6 +23,7 @@ class ExtractUsedNamesTest {
 		"<init>",
 		// AnyRef is dealiased into Object
 		"Object")
+
 	@Test
 	def importedName: Unit = {
 		val src = """
@@ -35,6 +36,22 @@ class ExtractUsedNamesTest {
 		val expectedNames = standardNames ++ Set("a", "A", "A2", "b")
 		assertEquals(expectedNames, usedNames)
 	}
+
+	@Test
+	def namesInTypeTree: Unit = {
+		val srcA = """|
+			|package a {
+			|  class A {
+			|    class C { class D }
+			|  }
+			|}""".stripMargin
+		val srcB = """|
+			|package b {
+			|	abstract class B { def foo: a.A#C#D }
+			|}""".stripMargin
+		val compilerForTesting = new ScalaCompilerForUnitTesting
+		val usedNames = compilerForTesting.extractUsedNamesFromSrc(srcA, srcB)
+		val expectedNames = standardNames ++ Set("a", "A", "C", "D", "b")
 		assertEquals(expectedNames, usedNames)
 	}
 

@@ -51,7 +51,7 @@ class ExtractUsedNamesTest {
 			|}""".stripMargin
 		val compilerForTesting = new ScalaCompilerForUnitTesting
 		val usedNames = compilerForTesting.extractUsedNamesFromSrc(srcA, srcB)
-		val expectedNames = standardNames ++ Set("a", "A", "C", "D", "b")
+		val expectedNames = standardNames ++ Set("a", "A", "B", "C", "D", "b")
 		assertEquals(expectedNames, usedNames)
 	}
 
@@ -67,7 +67,7 @@ class ExtractUsedNamesTest {
 			|}""".stripMargin
 		val compilerForTesting = new ScalaCompilerForUnitTesting
 		val usedNames = compilerForTesting.extractUsedNamesFromSrc(srcA, srcB)
-		val expectedNames = standardNames ++ Set("A", "=")
+		val expectedNames = standardNames ++ Set("A", "a", "B", "=")
 		assertEquals(expectedNames, usedNames)
 	}
 

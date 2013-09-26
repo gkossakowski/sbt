@@ -79,7 +79,6 @@ class ExtractUsedNames[GlobalType <: CallbackGlobal](val global: GlobalType) {
 
 		(symbol != NoSymbol) &&
 		!symbol.isSynthetic &&
-		!(symbol.ownerChain.exists(_.sourceFile == sourceFile)) &&
 		!emptyName(symbol.name)
 	}
 

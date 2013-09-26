@@ -55,4 +55,20 @@ class ExtractUsedNamesTest {
 		assertEquals(expectedNames, usedNames)
 	}
 
+	@Test
+	def symbolicNames: Unit = {
+		val srcA = """|
+			|class A {
+			|  def `=`: Int = 3
+			|}""".stripMargin
+		val srcB = """|
+			|class B {
+			|  def foo(a: A) = a.`=`
+			|}""".stripMargin
+		val compilerForTesting = new ScalaCompilerForUnitTesting
+		val usedNames = compilerForTesting.extractUsedNamesFromSrc(srcA, srcB)
+		val expectedNames = standardNames ++ Set("A", "=")
+		assertEquals(expectedNames, usedNames)
+	}
+
 }

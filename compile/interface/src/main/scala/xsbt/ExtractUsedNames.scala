@@ -21,7 +21,7 @@ class ExtractUsedNames[GlobalType <: CallbackGlobal](val global: GlobalType) {
 	private def extractByTreeWalk(tree: Tree, sourceFile: io.AbstractFile): Set[String] = {
 		val namesBuffer = collection.mutable.ListBuffer.empty[String]
 		def addSymbol(symbol: Symbol): Unit = {
-			val symbolNameAsString = symbol.name.toString
+			val symbolNameAsString = symbol.name.decode.trim
 			namesBuffer += symbolNameAsString
 		}
 		def handleTreeNode(node: Tree): Unit = node match {

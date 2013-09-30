@@ -43,28 +43,33 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
 	 * Implements a work-around for https://github.com/sbt/sbt/issues/823
 	 *
 	 * The strategy is to rename all type variables bound by existential type to stable
-	 * names by reseting a counter used in name generation right after given existential
-	 * type is processed.
+	 * names by assigning to each type variable a De Bruijn-like index. As a result, each
+	 * type variable gets name of this shape:
 	 *
-	 * We can reset the counter after each existential type is processed because the
-	 * scope of type variables by that type is just that type.
+	 *   "existential_${nestingLevel}_${i}"
+	 *
+	 * where `nestingLevel` indicates nesting level of existential types and `i` variable
+	 * indicates position of type variable in given existential type.
+	 *
+	 * This way, all names of existential type variables depend only on the structure of
+	 * existential types and are kept stable.
 	 */
 	private[this] object existentialRenamings {
-		private var counter: Int = _
-		private var renameTo: Map[Symbol, String] = _
-		reset()
+		private var nestingLevel: Int = 0
+		import scala.collection.mutable.Map
+		private var renameTo: Map[Symbol, String] = Map.empty
 
-		def reset(): Unit = {
-			counter = 0
-			renameTo = Map.empty
+		def leaveExistentialTypeVariables(typeVariables: Seq[Symbol]): Unit = {
+			nestingLevel -= 1
+			assert(nestingLevel >= 0)
+			typeVariables.foreach(renameTo.remove)
 		}
-		def allocateRenamings(typeVariables: Seq[Symbol]): Unit = {
-			val pairs = typeVariables map { tv =>
-				val newName = "existential" + counter
-				counter += 1
-				tv -> newName
+		def enterExistentialTypeVariables(typeVariables: Seq[Symbol]): Unit = {
+			nestingLevel += 1
+			typeVariables.zipWithIndex foreach { case (tv, i) =>
+				val newName = "existential_" + nestingLevel + "_" + i
+				renameTo(tv) = newName
 			}
-			renameTo = pairs.toMap
 		}
 		def renaming(symbol: Symbol): Option[String] = renameTo.get(symbol)
 	}
@@ -386,12 +391,12 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
 	private def makeExistentialType(in: Symbol, t: ExistentialType): xsbti.api.Existential = {
 		val ExistentialType(typeVariables, qualified) = t
 		try {
-			existentialRenamings.allocateRenamings(typeVariables)
+			existentialRenamings.enterExistentialTypeVariables(typeVariables)
 			val typeVariablesConverted = typeParameters(in, typeVariables)
 			val qualifiedConverted = processType(in, qualified)
 			new xsbti.api.Existential(qualifiedConverted, typeVariablesConverted)
 		} finally {
-			existentialRenamings.reset()
+			existentialRenamings.leaveExistentialTypeVariables(typeVariables)
 		}
 	}
 	private def typeParameters(in: Symbol, s: Symbol): Array[xsbti.api.TypeParameter] = typeParameters(in, s.typeParams)

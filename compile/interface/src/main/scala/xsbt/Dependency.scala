@@ -53,8 +53,11 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile
 							case None => ()
 						}
 					}
-					else
+					else {
+						val onClassName = className(on, '.')
+						callback.classNameDependency(onClassName, sourceFile, inherited)
 						callback.sourceDependency(onSource.file, sourceFile, inherited)
+					}
 				}
 
 				val dependenciesByMemberRef = extractDependenciesByMemberRef(unit)

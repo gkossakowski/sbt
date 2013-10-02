@@ -30,7 +30,7 @@ object DotGraph
 	{
 		def file(name: String) = new File(outputDir, name)
 		IO.createDirectory(outputDir)
-		generateGraph(file("int-source-deps"), "dependencies", relations.internalSrcDep, sourceToString, sourceToString)
+		generateGraph(file("int-source-deps"), "dependencies", relations.internalSrcDep, sourceToString, identity[String])
 		generateGraph(file("binary-dependencies"), "externalDependencies", relations.binaryDep, externalToString, sourceToString)
 	}
 
@@ -54,7 +54,7 @@ object DotGraph
 			("digraph " + graphName + " {") +:
 			mappings :+
 			"}"
-			
+
 		IO.writeLines(file, lines)
 	}
 	def sourceToString(roots: Iterable[File], source: File) =

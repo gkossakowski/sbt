@@ -14,6 +14,7 @@ package inc
 	import DefaultProtocol.tuple2Format
 	import Logger.{m2o, position, problem}
 	import Relations.SourceDependencies
+	import Relations.SourceDependenciesByClassName
 
 object AnalysisFormats
 {
@@ -99,11 +100,19 @@ object AnalysisFormats
 		asProduct2( APIs.apply _)( as => (as.internal, as.external) )(internalF, externalF)
 
 	implicit def relationsFormat(implicit prodF: Format[RFF], binF: Format[RFF], directF: Format[SourceDependencies],
-			inheritedF: Format[SourceDependencies], csF: Format[RFS], namesF: Format[RFS]): Format[Relations] =
-		asProduct6[Relations, RFF, RFF, SourceDependencies, SourceDependencies, RFS, RFS]((a,b,c,d,e,f) => Relations.make(a,b,c,d,e, f) )(rs => (rs.srcProd, rs.binaryDep, rs.memberRef, rs.inheritance, rs.classes, rs.names) )(prodF, binF, directF, inheritedF, csF, namesF)
+			publicInherited: Format[SourceDependencies], memberRefF: Format[SourceDependenciesByClassName],
+			inheritanceF: Format[SourceDependenciesByClassName], csF: Format[RFS], namesF: Format[RFS]): Format[Relations] =
+		asProduct8[Relations, RFF, RFF, SourceDependencies, SourceDependencies,
+			SourceDependenciesByClassName, SourceDependenciesByClassName, RFS, RFS](
+				(a,b,c,d,e,f,g,h) => Relations.make(a,b,c,d,e,f,g,h) )(
+						rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.memberRef, rs.inheritance, rs.classes, rs.names) )(
+								prodF, binF, directF, publicInherited, memberRefF, inheritanceF, csF, namesF)
 
 	implicit def relationsSourceFormat(implicit internalFormat: Format[Relation[File, File]], externalFormat: Format[Relation[File,String]]): Format[SourceDependencies] =
 		asProduct2[SourceDependencies, RFF, RFS]( (a, b) => Relations.makeSourceDependencies(a,b))( rs => (rs.internal, rs.external))
+
+	implicit def relationsSourceDependenciesByClassNameFormat(implicit internalFormat: Format[Relation[File, String]], externalFormat: Format[Relation[File,String]]): Format[SourceDependenciesByClassName] =
+		asProduct2[SourceDependenciesByClassName, RFS, RFS]( (a, b) => Relations.makeSourceDependenciesByClassName(a,b))( rs => (rs.internal, rs.external))(internalFormat, externalFormat)
 
 	implicit def relationFormat[A,B](implicit af: Format[Map[A, Set[B]]], bf: Format[Map[B, Set[A]]]): Format[Relation[A,B]] =
 		asProduct2[Relation[A,B], Map[A, Set[B]], Map[B, Set[A]]]( Relation.make _ )( r => (r.forwardMap, r.reverseMap) )(af, bf)

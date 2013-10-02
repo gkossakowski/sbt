@@ -98,8 +98,10 @@ object Incremental
 
 	// Package objects are fragile: if they inherit from an invalidated source, get "class file needed by package is missing" error
 	//  This might be too conservative: we probably only need package objects for packages of invalidated sources.
-	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] =
-		invalidated flatMap relations.inheritance.internal.reverse filter { _.getName == "package.scala" }
+	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] = {
+		val invalidatedClassNames = invalidated.flatMap(relations.classNames)
+		invalidatedClassNames flatMap relations.inheritance.internal.reverse filter { _.getName == "package.scala" }
+	}
 
 	/**
 	 * Logs API changes using debug-level logging. The API are obtained using the APIDiff class.
@@ -213,11 +215,19 @@ object Incremental
 
 	def invalidateIncremental(previous: Relations, apis: APIs, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
-		val memberRefReversed: File => Set[File] = previous.memberRef.internal.reverse _
+		val memberRefReversed: File => Set[File] = { srcFile =>
+			val classNames = previous.classNames(srcFile)
+			classNames flatMap { className =>
+				previous.memberRef.internal.reverse(className)
+			}
+		}
 		//val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
-		val dependsOnSrc: File => Set[File] = { to =>
-			val byInheritance = previous.inheritance.internal.reverse(to)
-			val byMemberRef = memberRefReversed(to) //memberRefDepsRevesredAndFiltered(to)
+		val dependsOnSrc: File => Set[File] = { srcFile =>
+			val classNames = previous.classNames(srcFile)
+			val byInheritance = classNames flatMap { className =>
+				previous.inheritance.internal.reverse(className)
+			}
+			val byMemberRef = memberRefReversed(srcFile) //memberRefDepsRevesredAndFiltered(to)
 			byInheritance ++ byMemberRef
 		}
 		val propagated =
@@ -294,13 +304,16 @@ object Incremental
 		val transitiveInheritance = byExternalInheritance flatMap { invalidatedExternallyByInheritance =>
 			invalidateByInheritance(relations, invalidatedExternallyByInheritance, log)
 		}
-		val memberRefDepsInternal = memberRefDepependencies[File](relations.memberRef.internal.reverse,
+		val memberRefDepsInternal = memberRefDepependencies[String](relations.memberRef.internal.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
 		val memberRefDepsExternal = memberRefDepependencies[String](relations.memberRef.external.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
 		// Get the direct dependencies of all sources transitively invalidated by inheritance
 		log.debug("Getting direct dependencies of all sources transitively invalidated by inheritance.")
-		val directA = transitiveInheritance flatMap memberRefDepsInternal
+		val directA = transitiveInheritance flatMap { srcFile =>
+			val definedClassNamesInSrcFile = relations.classNames(srcFile)
+			definedClassNamesInSrcFile flatMap memberRefDepsInternal
+		}
 		// Get the sources that directly depend on externals.  This includes non-inheritance dependencies and is not transitive.
 		log.debug(s"Getting source that directly depend on (external) $modified.")
 		val directB = memberRefDepsExternal(modified)
@@ -324,7 +337,10 @@ object Incremental
 	}
 
 	private def invalidateByInheritance(relations: Relations, modified: File, log: Logger): Set[File] = {
-		val inheritanceDeps = relations.inheritance.internal.reverse _
+		val inheritanceDeps: File => Set[File] = { srcFile =>
+			val definedClassNamesInSrcFile = relations.classNames(srcFile)
+			definedClassNamesInSrcFile flatMap relations.inheritance.internal.reverse
+		}
 		log.debug(s"Invalidating (transitively) by inheritance from $modified...")
 		val transitiveInheritance = transitiveDeps(Set(modified), log)(inheritanceDeps)
 		log.debug("Invalidated by transitive inheritance dependency: " + transitiveInheritance)
@@ -353,8 +369,11 @@ object Incremental
 
 	private def invalidateSource(relations: Relations, apiChange: APIChange[File], log: Logger): Set[File] = {
 		val transitiveInheritance = invalidateByInheritance(relations, apiChange.modified, log)
-		val memberRefDeps = memberRefDepependencies[File](relations.memberRef.internal.reverse, relations.names.forwardMap, apiChange, log)
-		val memberRef = transitiveInheritance flatMap memberRefDeps
+		val memberRefDeps = memberRefDepependencies[String](relations.memberRef.internal.reverse, relations.names.forwardMap, apiChange, log)
+		val memberRef = transitiveInheritance flatMap { srcFile =>
+			val definedClassNamesInSrcFile = relations.classNames(srcFile)
+			definedClassNamesInSrcFile flatMap memberRefDeps
+		}
 		val all = transitiveInheritance ++ memberRef
 		all
 	}

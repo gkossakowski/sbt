@@ -22,7 +22,8 @@ trait Analysis
 	def copy(stamps: Stamps = stamps, apis: APIs = apis, relations: Relations = relations, infos: SourceInfos = infos,
 	    compilations: Compilations = compilations): Analysis
 
-	def addSource(src: File, api: Source, stamp: Stamp, memberRefInternalDeps: Iterable[File], inheritedInternalDeps: Iterable[File], info: SourceInfo): Analysis
+	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File],
+			memberRefInternal: Iterable[String], inheritanceInternal: Iterable[String], info: SourceInfo): Analysis
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis
 	def addExternalDep(src: File, dep: String, api: Source, inherited: Boolean): Analysis
 	def addProduct(src: File, product: File, stamp: Stamp, name: String): Analysis
@@ -78,8 +79,12 @@ private class MAnalysis(val stamps: Stamps, val apis: APIs, val relations: Relat
 	def copy(stamps: Stamps, apis: APIs, relations: Relations, infos: SourceInfos, compilations: Compilations = compilations): Analysis =
 	  new MAnalysis(stamps, apis, relations, infos, compilations)
 
-	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File], info: SourceInfo): Analysis =
-		copy( stamps.markInternalSource(src, stamp), apis.markInternalSource(src, api), relations.addInternalSrcDeps(src, directInternal, inheritedInternal), infos.add(src, info) )
+	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File],
+			memberRefInternal: Iterable[String], inheritanceInternal: Iterable[String], info: SourceInfo): Analysis = {
+		val relationsWithSrcDeps = relations.addInternalSrcDeps(src, directInternal, inheritedInternal)
+		val relationsWithClassNameDeps = relationsWithSrcDeps.addInternalClassNameDeps(src, memberRefInternal, inheritanceInternal)
+		copy( stamps.markInternalSource(src, stamp), apis.markInternalSource(src, api), relationsWithClassNameDeps, infos.add(src, info) )
+	}
 
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis =
 		copy( stamps.markBinary(dep, className, stamp), apis, relations.addBinaryDep(src, dep), infos )

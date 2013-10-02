@@ -23,7 +23,7 @@ abstract class LocateClassFile extends Compat
 	if (sym hasFlag scala.tools.nsc.symtab.Flags.PACKAGE) None else
 	{
 		import scala.tools.nsc.symtab.Flags
-		val name = flatname(sym, classSeparator) + moduleSuffix(sym)
+		val name = className(sym, classSeparator)
 		findClass(name).map { case (file,inOut) => (file, name,inOut) } orElse {
 			if(isTopLevelModule(sym))
 			{
@@ -44,6 +44,11 @@ abstract class LocateClassFile extends Compat
 		atPhase (currentRun.picklerPhase.next) {
 			sym.isModuleClass && !sym.isImplClass && !sym.isNestedClass
 		}
+	protected def className(s: Symbol, sep: Char): String = {
+		// can't use Symbol.needsModuleSuffix because it's not available in Scala 2.9.x
+		val needsModuleSuffix = moduleSuffix(s) != ""
+		className(s, sep, needsModuleSuffix)
+	}
 	protected def className(s: Symbol, sep: Char, dollarRequired: Boolean): String =
 		flatname(s, sep) + (if(dollarRequired) "$" else "")
 	protected def fileForClass(outputDirectory: File, s: Symbol, separatorRequired: Boolean): File =

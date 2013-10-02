@@ -120,6 +120,7 @@ class ScalaCompilerForUnitTesting {
 		val usedNames: Map[File, Set[String]] = Map.empty
 		def beginSource(source: File): Unit = ()
 		def sourceDependency(dependsOn: File, source: File, publicInherited: Boolean): Unit = ()
+		def classNameDependency(className: String, source: File, publicInherited: Boolean): Unit = ()
 		def binaryDependency(binary: File, name: String, source: File, publicInherited: Boolean): Unit = ()
 		def generatedClass(source: File, module: File, name: String): Unit = ()
 		def endSource(sourcePath: File): Unit = ()

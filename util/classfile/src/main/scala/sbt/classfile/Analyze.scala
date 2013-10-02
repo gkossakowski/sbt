@@ -38,7 +38,7 @@ private[sbt] object Analyze
 			productToSource(newClass) = source
 			sourceToClassFiles.getOrElseUpdate(source, new ArrayBuffer[ClassFile]) += classFile
 		}
-			
+
 		// get class to class dependencies and map back to source to class dependencies
 		for( (source, classFiles) <- sourceToClassFiles )
 		{
@@ -57,7 +57,9 @@ private[sbt] object Analyze
 							assume(url.getProtocol == "file")
 							productToSource.get(file) match
 							{
-								case Some(dependsOn) => analysis.sourceDependency(dependsOn, source, inherited)
+								case Some(dependsOn) =>
+									analysis.sourceDependency(dependsOn, source, inherited)
+									analysis.classNameDependency(tpe, source, inherited)
 								case None => analysis.binaryDependency(file, tpe, source, inherited)
 							}
 						}
@@ -65,7 +67,7 @@ private[sbt] object Analyze
 				}
 			}
 			def processDependencies(tpes: Iterable[String], inherited: Boolean): Unit = tpes.foreach(tpe => processDependency(tpe, inherited))
-				
+
 			val notInherited = classFiles.flatMap(_.types).toSet -- publicInherited
 			processDependencies(notInherited, false)
 			processDependencies(publicInherited, true)
@@ -114,7 +116,7 @@ private[sbt] object Analyze
 	}
 	private def findSource(sourceNameMap: Map[String, Iterable[File]], pkg: List[String], sourceFileName: String): List[File] =
 		refine( (sourceNameMap get sourceFileName).toList.flatten.map { x => (x,x.getParentFile) }, pkg.reverse)
-	
+
 	@tailrec private def refine(sources: List[(File, File)], pkgRev: List[String]): List[File] =
 	{
 		def make = sources.map(_._1)
@@ -155,7 +157,7 @@ private[sbt] object Analyze
 		method.getReturnType == unit &&
 		method.getParameterTypes.toList == strArray
 	private def isMain(modifiers: Int): Boolean = (modifiers & mainModifiers) == mainModifiers && (modifiers & notMainModifiers) == 0
-	
+
 	private val mainModifiers = STATIC  | PUBLIC
 	private val notMainModifiers = ABSTRACT
 }

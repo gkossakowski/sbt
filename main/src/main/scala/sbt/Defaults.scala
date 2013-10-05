@@ -83,8 +83,7 @@ object Defaults extends BuildCommon
 		watchingMessage := Watched.defaultWatchingMessage,
 		triggeredMessage := Watched.defaultTriggeredMessage,
 		definesClass :== FileValueCache(Locate.definesClass _ ).get,
-		trapExit :== false,
-		trapExit in run :== true,
+		trapExit :== true,
 		traceLevel in run :== 0,
 		traceLevel in runMain :== 0,
 		traceLevel in console :== Int.MaxValue,
@@ -129,7 +128,7 @@ object Defaults extends BuildCommon
 		includeFilter in unmanagedSources :== "*.java" | "*.scala",
 		includeFilter in unmanagedJars :== "*.jar" | "*.so" | "*.dll" | "*.jnilib" | "*.zip",
 		includeFilter in unmanagedResources :== AllPassFilter,
-		excludeFilter :== (".*"  - ".") || HiddenFileFilter,
+		excludeFilter :== HiddenFileFilter,
 		pomIncludeRepository :== Classpaths.defaultRepositoryFilter
 	))
 	def defaultTestTasks(key: Scoped): Seq[Setting[_]] = inTask(key)(Seq(
@@ -510,7 +509,7 @@ object Defaults extends BuildCommon
 			filters.map { f => (s: String) => f accept s }
 	}
 	def detectTests: Initialize[Task[Seq[TestDefinition]]] = (loadedTestFrameworks, compile, streams) map { (frameworkMap, analysis, s) =>
-		Tests.discover(frameworkMap.values.toSeq, analysis, s.log)._1
+		Tests.discover(frameworkMap.values.toList, analysis, s.log)._1
 	}
 	def defaultRestrictions: Initialize[Seq[Tags.Rule]] = parallelExecution { par =>
 		val max = EvaluateTask.SystemProcessors

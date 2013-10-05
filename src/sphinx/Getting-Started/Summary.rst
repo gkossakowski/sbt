@@ -23,7 +23,7 @@ sbt: The Core Concepts
 -  your build definition is one big list of `Setting` objects, where a
    `Setting` transforms the set of key-value pairs sbt uses to perform
    tasks.
--  to create a `Setting`, call one of a few methods on a key: `:=`, `+=`, `++=`, or `~=`.
+-  to create a `Setting`, call one of a few methods on a key: `:=`, `+=`, or `++=`.
 -  there is no mutable state, only transformation; for example, a
    `Setting` transforms sbt's collection of key-value pairs into a new
    collection. It doesn't change anything in-place.
@@ -50,9 +50,8 @@ sbt: The Core Concepts
 -  add plugins with the `addSbtPlugin` method in `project/plugins.sbt`
    (NOT `build.sbt` in the project's base directory).
 
-If any of this leaves you wondering rather than nodding, please ask for
-help on the `mailing list`_, go
-back and re-read, or try some experiments in sbt's interactive mode.
+If any of this leaves you wondering rather than nodding, please :ref:`ask for help <getting-help>`,
+go back and re-read, or try some experiments in sbt's interactive mode.
 
 Good luck!
 

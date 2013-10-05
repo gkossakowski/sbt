@@ -15,6 +15,7 @@ package sbt
 
 	import java.io.File
 	import java.net.URI
+	import java.util.Locale
 
 /** This class is the entry point for sbt.*/
 final class xMain extends xsbti.AppMain
@@ -23,7 +24,7 @@ final class xMain extends xsbti.AppMain
 	{
 		import BuiltinCommands.{initialize, defaults}
 		import CommandStrings.{BootCommand, DefaultsCommand, InitCommand}
-		MainLoop.runLogged( initialState(configuration,
+		runManaged( initialState(configuration,
 			Seq(initialize, defaults),
 			DefaultsCommand :: InitCommand :: BootCommand :: Nil)
 		)
@@ -32,7 +33,7 @@ final class xMain extends xsbti.AppMain
 final class ScriptMain extends xsbti.AppMain
 {
 	def run(configuration: xsbti.AppConfiguration): xsbti.MainResult =
-		MainLoop.runLogged( initialState(configuration,
+		runManaged( initialState(configuration,
 			BuiltinCommands.ScriptCommands,
 			Script.Name :: Nil)
 		)
@@ -40,7 +41,7 @@ final class ScriptMain extends xsbti.AppMain
 final class ConsoleMain extends xsbti.AppMain
 {
 	def run(configuration: xsbti.AppConfiguration): xsbti.MainResult =
-		MainLoop.runLogged( initialState(configuration,
+		runManaged( initialState(configuration,
 			BuiltinCommands.ConsoleCommands,
 			IvyConsole.Name :: Nil)
 		)
@@ -48,6 +49,13 @@ final class ConsoleMain extends xsbti.AppMain
 
 object StandardMain
 {
+	def runManaged(s: State): xsbti.MainResult =
+	{
+		val previous = TrapExit.installManager()
+		try MainLoop.runLogged(s)
+		finally TrapExit.uninstallManager(previous)
+	}
+
 	/** The common interface to standard output, used for all built-in ConsoleLoggers. */
 	val console = ConsoleOut.systemOutOverwrite(ConsoleOut.overwriteContaining("Resolving "))
 
@@ -394,7 +402,7 @@ object BuiltinCommands
 	def loadFailed = Command.command(LoadFailed)(handleLoadFailed)
 	@tailrec def handleLoadFailed(s: State): State =
 	{
-		val result = (SimpleReader.readLine("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? ") getOrElse Quit).toLowerCase
+		val result = (SimpleReader.readLine("Project loading failed: (r)etry, (q)uit, (l)ast, or (i)gnore? ") getOrElse Quit).toLowerCase(Locale.ENGLISH)
 		def matches(s: String) = !result.isEmpty && (s startsWith result)
 
 		if(result.isEmpty || matches("retry"))

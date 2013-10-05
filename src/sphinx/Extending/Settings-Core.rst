@@ -30,7 +30,7 @@ build.sbt file:
 
 Then, put the following examples in source files
 `SettingsExample.scala` and `SettingsUsage.scala`. Finally, run sbt
-and enter the REPL using `console`. To see the output described below,
+and enter the REPL using :key:`console`. To see the output described below,
 enter `SettingsUsage`.
 
 Example Settings System
@@ -217,7 +217,7 @@ underlying `SettingKey[Task[T]]` (and they both wrap an underlying
 For example, `a := 3` for a SettingKey *a* will very roughly translate
 to `setting(a, value(3))`. For a TaskKey *a*, it will roughly
 translate to `setting(a, value( task { 3 } ) )`. See
-`main/Structure.scala <../../sxr/Structure.scala>`_
+`main/Structure.scala <../../sxr/sbt/Structure.scala>`_
 for details.
 
 Settings definitions

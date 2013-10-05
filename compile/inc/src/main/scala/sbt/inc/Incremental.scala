@@ -79,7 +79,7 @@ object Incremental
 			val incChanges = changedIncremental(invalidated, previous.apis.internalAPI _, merged.apis.internalAPI _, log, options)
 			debug("\nChanges:\n" + incChanges)
 			val transitiveStep = options.transitiveStep
-			val incInv = invalidateIncremental(merged.relations, merged.apis, incChanges, invalidated, cycleNum >= transitiveStep, log)
+			val incInv = invalidateIncremental(previous.relations, merged.relations, merged.apis, incChanges, invalidated, cycleNum >= transitiveStep, log)
 			cycle(incInv, allSources, emptyChanges, merged, doCompile, classfileManager, cycleNum+1, log, options)
 		}
 	private[this] def emptyChanges: DependencyChanges = new DependencyChanges {
@@ -213,19 +213,19 @@ object Incremental
 			val (changed, unmodified) = inBoth.partition(existingModified)
 		}
 
-	def invalidateIncremental(previous: Relations, apis: APIs, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
+	def invalidateIncremental(previous: Relations, recompiledRelations: Relations, apis: APIs, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
 		val memberRefReversed: File => Set[File] = { srcFile =>
 			val classNames = previous.classNames(srcFile)
 			classNames flatMap { className =>
-				previous.memberRef.internal.reverse(className)
+				recompiledRelations.memberRef.internal.reverse(className)
 			}
 		}
 		//val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
 		val dependsOnSrc: File => Set[File] = { srcFile =>
 			val classNames = previous.classNames(srcFile)
 			val byInheritance = classNames flatMap { className =>
-				previous.inheritance.internal.reverse(className)
+				recompiledRelations.inheritance.internal.reverse(className)
 			}
 			val byMemberRef = memberRefReversed(srcFile) //memberRefDepsRevesredAndFiltered(to)
 			byInheritance ++ byMemberRef
@@ -234,10 +234,10 @@ object Incremental
 			if(transitive)
 				transitiveDependencies(dependsOnSrc, changes.apiChanges.map(_.modified).toSet, log)
 			else {
-				invalidateIntermediate(previous, changes, log)
+				invalidateIntermediate(previous, recompiledRelations, changes, log)
 			}
 
-		val dups = invalidateDuplicates(previous)
+		val dups = invalidateDuplicates(recompiledRelations)
 		if(dups.nonEmpty)
 			log.debug("Invalidated due to generated class file collision: " + dups)
 
@@ -302,7 +302,8 @@ object Incremental
 		val byExternalInheritance = externalInheritanceR.reverse(modified)
 		log.debug(s"Files invalidated by inheriting from (external) $modified: $byExternalInheritance; now invalidating by inheritance (internally).")
 		val transitiveInheritance = byExternalInheritance flatMap { invalidatedExternallyByInheritance =>
-			invalidateByInheritance(relations, invalidatedExternallyByInheritance, log)
+			// we are still in initial stage of invalidation so previous and recompiled relations are the same
+			invalidateByInheritance(relations, relations, invalidatedExternallyByInheritance, log)
 		}
 		val memberRefDepsInternal = memberRefDepependencies[String](relations.memberRef.internal.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
@@ -322,24 +323,24 @@ object Incremental
 
 
 	/** Intermediate invalidation step: steps after the initial invalidation, but before the final transitive invalidation. */
-	def invalidateIntermediate(relations: Relations, changes: APIChanges[File], log: Logger): Set[File] =
+	def invalidateIntermediate(previousRelations: Relations, recompiledRelations: Relations, changes: APIChanges[File], log: Logger): Set[File] =
 	{
-		invalidateSources(changes, log, relations)
+		invalidateSources(changes, log, previousRelations, recompiledRelations)
 	}
 	/** Invalidates inheritance dependencies, transitively.  Then, invalidates direct dependencies.  Finally, excludes initial dependencies not
 	* included in a cycle with newly invalidated sources. */
-	private[this] def invalidateSources(changes: APIChanges[File], log: Logger, relations: Relations): Set[File] =
+	private[this] def invalidateSources(changes: APIChanges[File], log: Logger, previousRelations: Relations, recompiledRelations: Relations): Set[File] =
 	{
 		val all = changes.apiChanges flatMap { apiChange =>
-			invalidateSource(relations, apiChange, log)
+			invalidateSource(previousRelations, recompiledRelations, apiChange, log)
 		}
 		all.toSet
 	}
 
-	private def invalidateByInheritance(relations: Relations, modified: File, log: Logger): Set[File] = {
+	private def invalidateByInheritance(previousRelations: Relations, recompiledRelations: Relations, modified: File, log: Logger): Set[File] = {
 		val inheritanceDeps: File => Set[File] = { srcFile =>
-			val definedClassNamesInSrcFile = relations.classNames(srcFile)
-			definedClassNamesInSrcFile flatMap relations.inheritance.internal.reverse
+			val definedClassNamesInSrcFile = previousRelations.classNames(srcFile)
+			definedClassNamesInSrcFile flatMap recompiledRelations.inheritance.internal.reverse
 		}
 		log.debug(s"Invalidating (transitively) by inheritance from $modified...")
 		val transitiveInheritance = transitiveDeps(Set(modified), log)(inheritanceDeps)
@@ -367,11 +368,11 @@ object Incremental
 		memberRefDeps
 	}
 
-	private def invalidateSource(relations: Relations, apiChange: APIChange[File], log: Logger): Set[File] = {
-		val transitiveInheritance = invalidateByInheritance(relations, apiChange.modified, log)
-		val memberRefDeps = memberRefDepependencies[String](relations.memberRef.internal.reverse, relations.names.forwardMap, apiChange, log)
+	private def invalidateSource(previousRelations: Relations, recompiledRelations: Relations, apiChange: APIChange[File], log: Logger): Set[File] = {
+		val transitiveInheritance = invalidateByInheritance(previousRelations, recompiledRelations, apiChange.modified, log)
+		val memberRefDeps = memberRefDepependencies[String](recompiledRelations.memberRef.internal.reverse, recompiledRelations.names.forwardMap, apiChange, log)
 		val memberRef = transitiveInheritance flatMap { srcFile =>
-			val definedClassNamesInSrcFile = relations.classNames(srcFile)
+			val definedClassNamesInSrcFile = previousRelations.classNames(srcFile)
 			definedClassNamesInSrcFile flatMap memberRefDeps
 		}
 		val all = transitiveInheritance ++ memberRef

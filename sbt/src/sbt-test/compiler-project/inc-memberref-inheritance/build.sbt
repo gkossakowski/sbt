@@ -24,13 +24,15 @@ TaskKey[Unit]("check-compilations") <<= (compile in Compile, scalaSource in Comp
     assert(recompiledFiles(iteration) == files, "%s != %s".format(recompiledFiles(iteration), files))
   }
   // Y.scala is compiled only at the beginning as changes to A.scala do not affect it
-  recompiledFilesInIteration(0, Set("Y.scala"))
+  recompiledFilesInIteration(0, Set("X.scala", "Y.scala"))
   // A.scala is changed and recompiled
-  recompiledFilesInIteration(1, Set("A.scala"))
+  //should be: `recompiledFilesInIteration(1, Set.empty)` but due to known bug A.scala is compiled again
+  // in second iteration
+  recompiledFilesInIteration(1, Set.empty)
   // change in A.scala causes recompilation of B.scala, C.scala, D.scala which depend on transtiviely
   // and by inheritance on A.scala
-  // X.scala is also recompiled because it depends directly on B.scala
-  // Note that Y.scala is not recompiled because it depends just on X through direct dependency
-  recompiledFilesInIteration(2, Set("B.scala", "C.scala", "D.scala", "X.scala"))
+  // X.scala is not recompiled altough it depends directly on B.scala, it's not invalidated because
+  // only the name `foo` has been changed in A.scala and X.scala doesn't use name `foo`
+  recompiledFilesInIteration(2, Set("A.scala", "B.scala", "C.scala", "D.scala"))
   assert(allCompilations.size == 3)
 }

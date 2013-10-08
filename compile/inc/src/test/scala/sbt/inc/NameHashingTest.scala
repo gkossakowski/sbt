@@ -26,8 +26,8 @@ class NameHashingTest {
 		val classB = simpleClass("Foo", nestedBar2, nestedBar1)
 		val api1 = new SourceAPI(Array.empty, Array(classA))
 		val api2 = new SourceAPI(Array.empty, Array(classB))
-		val nameHashes1 = nameHashing.nameHashes(api1)
-		val nameHashes2 = nameHashing.nameHashes(api2)
+		val nameHashes1 = nameHashing.nameHashesForSource(api1)
+		val nameHashes2 = nameHashing.nameHashesForSource(api2)
 		val def1Hash = HashAPI(def1)
 		val def2Hash = HashAPI(def2)
 		assertNotEquals(def1Hash, def2Hash)
@@ -66,8 +66,8 @@ class NameHashingTest {
 		}
 		val api1 = new SourceAPI(Array.empty, Array(classA))
 		val api2 = new SourceAPI(Array.empty, Array(classB))
-		val nameHashes1 = nameHashing.nameHashes(api1)
-		val nameHashes2 = nameHashing.nameHashes(api2)
+		val nameHashes1 = nameHashing.nameHashesForSource(api1)
+		val nameHashes2 = nameHashing.nameHashesForSource(api2)
 		assertNotEquals(nameHashes1, nameHashes2)
 	}
 
@@ -151,28 +151,33 @@ class NameHashingTest {
 		assertNameHashNotEqualForRegularName("bar", nameHashes1, nameHashes2)
 	}
 
-	private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashes,
-			nameHashes2: NameHashes): Unit = {
+	private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashesForClass,
+			nameHashes2: NameHashesForClass): Unit = {
 		val nameHash1 = nameHashForRegularName(nameHashes1, name)
 		val nameHash2 = nameHashForRegularName(nameHashes1, name)
 		assertEquals(nameHash1, nameHash2)
 	}
 
-	private def assertNameHashNotEqualForRegularName(name: String, nameHashes1: NameHashes,
-			nameHashes2: NameHashes): Unit = {
+	private def assertNameHashNotEqualForRegularName(name: String, nameHashes1: NameHashesForClass,
+			nameHashes2: NameHashesForClass): Unit = {
 		val nameHash1 = nameHashForRegularName(nameHashes1, name)
 		val nameHash2 = nameHashForRegularName(nameHashes2, name)
 		assertNotEquals(nameHash1, nameHash2)
 	}
 
-	private def nameHashForRegularName(nameHashes: NameHashes, name: String): NameHash = {
-		nameHashes.regularMembers.find(_.name == name).get
+	private def nameHashForRegularName(nameHashesForClass: NameHashesForClass, name: String): NameHash = {
+		val allRegularMembers = nameHashesForClass.regularMembers
+		val nameHashes = nameHashesForClass.regularMembers.filter(_.name == name)
+		assert(nameHashes.size == 1, nameHashes)
+		nameHashes.head
 	}
 
-	private def nameHashesForClass(cl: ClassLike): NameHashes = {
+	private def nameHashesForClass(cl: ClassLike): NameHashesForClass = {
 		val sourceAPI = new SourceAPI(Array.empty, Array(cl))
 		val nameHashing = new NameHashing
-		nameHashing.nameHashes(sourceAPI)
+		val nameHashesForSource = nameHashing.nameHashesForSource(sourceAPI)
+		assert(nameHashesForSource.nameHashesForClassName.size == 1, nameHashesForSource)
+		nameHashesForSource.nameHashesForClassName.head
 	}
 
 	private def lzy[T](x: T): Lazy[T] = new Lazy[T] { def get: T = x }

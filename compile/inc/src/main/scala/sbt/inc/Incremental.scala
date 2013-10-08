@@ -169,9 +169,9 @@ object Incremental
 		if (SameAPI(a,b))
 			None
 		else {
-			val aNameHashes = NameHashes.fromXsbtiEquivalent(a.nameHashes)
-			val bNameHashes = NameHashes.fromXsbtiEquivalent(b.nameHashes)
-			val namesWithModifiedHashes = NamesWithModifiedHashes.compareTwoNameHashes(aNameHashes, bNameHashes)
+			val aNameHashes = NameHashesForSource.fromXsbtiEquivalent(a.nameHashesForSource)
+			val bNameHashes = NameHashesForSource.fromXsbtiEquivalent(b.nameHashesForSource)
+			val namesWithModifiedHashes = NamesWithModifiedHashes.compareTwoNameHashesForSource(aNameHashes, bNameHashes)
 			val sourceApiChange = SourceAPIChange(src, namesWithModifiedHashes)
 			Some(sourceApiChange)
 		}
@@ -305,9 +305,9 @@ object Incremental
 			// we are still in initial stage of invalidation so previous and recompiled relations are the same
 			invalidateByInheritance(relations, relations, invalidatedExternallyByInheritance, log)
 		}
-		val memberRefDepsInternal = memberRefDepependencies[String](relations.memberRef.internal.reverse,
+		val memberRefDepsInternal = memberRefDepependencies(relations.memberRef.internal.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
-		val memberRefDepsExternal = memberRefDepependencies[String](relations.memberRef.external.reverse,
+		val memberRefDepsExternal = memberRefDepependencies(relations.memberRef.external.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
 		// Get the direct dependencies of all sources transitively invalidated by inheritance
 		log.debug("Getting direct dependencies of all sources transitively invalidated by inheritance.")
@@ -348,29 +348,49 @@ object Incremental
 		transitiveInheritance
 	}
 
-	private def memberRefDepependencies[T](memberRef: T => Set[File], usedNames: File => Set[String], apiChange: APIChange[_],
-			log: Logger): T => Set[File] = {
+	private def memberRefDepependencies(memberRef: String => Set[File], usedNames: File => Set[String], apiChange: APIChange[_],
+			log: Logger): String => Set[File] = {
+
+		case class ModifiedImplicitNamesInClass(className: String, implicitNames: Set[String])
+		def changedImplicitsInSource(modifiedNamesInSource: NamesWithModifiedHashesInSource):
+		  Seq[ModifiedImplicitNamesInClass] = {
+		    modifiedNamesInSource.namesWithModifiedHashesInClass.flatMap { modifiedNamesInClass =>
+				val modifiedImplicitNames = modifiedNamesInClass.implicitNames
+				if (modifiedImplicitNames.isEmpty)
+					None
+				else {
+					val className = modifiedNamesInClass.className
+					Some(ModifiedImplicitNamesInClass(className, modifiedImplicitNames))
+				}
+			}
+		}
 
 		val memberRefDeps = apiChange match {
 			case APIChangeDueToMacroDefinition(modifiedSrcFile) =>
 				log.debug(s"The $modifiedSrcFile source file declares the macro. All direct dependencies are invalidated.")
 				memberRef
-			case SourceAPIChange(modifiedSrcFile, changedNames) if !changedNames.implicitNames.isEmpty =>
-				log.debug(s"The $modifiedSrcFile source file has the following implicit definitions changed:" +
-						  s"${changedNames.implicitNames.mkString(", ")}. All direct dependencies are invalidated.")
+			case SourceAPIChange(modifiedSrcFile, changedNamesInSource) =>
+			  val changedImplicits = changedImplicitsInSource(changedNamesInSource)
+			  if (!changedImplicits.isEmpty) {
+				log.debug(s"""|The $modifiedSrcFile source file has the following implicit definitions changed:
+						      |${changedImplicits.mkString("\n")}
+				              |All direct dependencies are invalidated.""")
 				memberRef
-			case SourceAPIChange(modifiedSrcFile, changedNames) =>
-				log.debug("Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies.\n" +
-						  s"Scala dependencies with following used names are considered: ${changedNames.regularNames}.\n" +
-                          "All Java dependencies are considered.")
-				new NameHashFilteredDependencies2(usedNames, memberRef, changedNames.regularNames, log)
+			  } else {
+			  	log.debug(s"""|Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies.
+						     |Scala dependencies with the following (className, usedNames) pairs are considered:
+			  			     |${changedNamesInSource.namesWithModifiedHashesInClass.map(x => (x.className, x.regularNames)).mkString("\n")}
+                             |All Java dependencies are considered.""")
+				new NameHashFilteredDependencies2(usedNames, memberRef, changedNamesInSource, log)
+			  }
+
 		}
 		memberRefDeps
 	}
 
 	private def invalidateSource(previousRelations: Relations, recompiledRelations: Relations, apiChange: APIChange[File], log: Logger): Set[File] = {
 		val transitiveInheritance = invalidateByInheritance(previousRelations, recompiledRelations, apiChange.modified, log)
-		val memberRefDeps = memberRefDepependencies[String](recompiledRelations.memberRef.internal.reverse, recompiledRelations.names.forwardMap, apiChange, log)
+		val memberRefDeps = memberRefDepependencies(recompiledRelations.memberRef.internal.reverse, recompiledRelations.names.forwardMap, apiChange, log)
 		val memberRef = transitiveInheritance flatMap { srcFile =>
 			val definedClassNamesInSrcFile = previousRelations.classNames(srcFile)
 			definedClassNamesInSrcFile flatMap memberRefDeps

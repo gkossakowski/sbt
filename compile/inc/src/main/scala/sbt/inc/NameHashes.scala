@@ -1,18 +1,32 @@
 package sbt.inc
 
-case class NameHashes(regularMembers: Set[NameHash], implicitMembers: Set[NameHash]) {
-	def toXsbtiEquivalent: xsbti.api.NameHashes = {
-		def convertMembers(members: Iterable[NameHash]): Array[xsbti.api.NameHash] =
-			members.toArray.map(_.toXsbtiEquivalent)
-		new xsbti.api.NameHashes(convertMembers(regularMembers), convertMembers(implicitMembers))
+case class NameHashesForSource(nameHashesForClassName: Set[NameHashesForClass]) {
+	final def toXsbtiEquivalent: xsbti.api.NameHashesForSource = {
+		new xsbti.api.NameHashesForSource(nameHashesForClassName.map(_.toXsbtiEquivalent).toArray)
 	}
 }
 
-object NameHashes {
-	def fromXsbtiEquivalent(xsbtiNameHashes: xsbti.api.NameHashes): NameHashes = {
+object NameHashesForSource {
+	def fromXsbtiEquivalent(xsbtiNameHashesForSource: xsbti.api.NameHashesForSource): NameHashesForSource = {
+		val nameHashesForClass = xsbtiNameHashesForSource.nameHashesForClass.map(NameHashesForClass.fromXsbtiEquivalent)
+		NameHashesForSource(nameHashesForClass.toSet)
+	}
+}
+
+case class NameHashesForClass(className: String, regularMembers: Set[NameHash], implicitMembers: Set[NameHash]) {
+	final def toXsbtiEquivalent: xsbti.api.NameHashesForClass = {
+		def convertMembers(members: Iterable[NameHash]): Array[xsbti.api.NameHash] =
+			members.toArray.map(_.toXsbtiEquivalent)
+		new xsbti.api.NameHashesForClass(className, convertMembers(regularMembers), convertMembers(implicitMembers))
+	}
+}
+
+object NameHashesForClass {
+	def fromXsbtiEquivalent(xsbtiNameHashes: xsbti.api.NameHashesForClass): NameHashesForClass = {
 		def convertMembers(members: Array[xsbti.api.NameHash]): Set[NameHash] =
 			members.map(NameHash.fromXsbtiEquivalent).toSet
-		NameHashes(convertMembers(xsbtiNameHashes.regularMembers), convertMembers(xsbtiNameHashes.implicitMembers))
+		NameHashesForClass(xsbtiNameHashes.className, convertMembers(xsbtiNameHashes.regularMembers),
+		  convertMembers(xsbtiNameHashes.implicitMembers))
 	}
 }
 

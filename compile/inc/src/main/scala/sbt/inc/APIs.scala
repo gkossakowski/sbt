@@ -7,7 +7,6 @@ package inc
 import xsbti.api.Source
 import java.io.File
 import APIs.getAPI
-import xsbti.api.NameHashes
 
 trait APIs
 {
@@ -40,8 +39,8 @@ object APIs
 
 	val emptyAPI = new xsbti.api.SourceAPI(Array(), Array())
 	val emptyCompilation = new xsbti.api.Compilation(-1, Array())
-	val emptyNameHashes = new xsbti.api.NameHashes(Array.empty, Array.empty)
-	val emptySource = new xsbti.api.Source(emptyCompilation, Array(), emptyAPI, 0, emptyNameHashes, false)
+	val emptyNameHashesForSource = new xsbti.api.NameHashesForSource(Array.empty[xsbti.api.NameHashesForClass])
+	val emptySource = new xsbti.api.Source(emptyCompilation, Array(), emptyAPI, 0, emptyNameHashesForSource, false)
 	def getAPI[T](map: Map[T, Source], src: T): Source = map.getOrElse(src, emptySource)
 }
 

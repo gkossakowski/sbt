@@ -4,20 +4,23 @@ import java.io.File
 import sbt.Logger
 import sbt.Relation
 
-class NameHashFilteredDependencies2[T](
+class NameHashFilteredDependencies2(
 		names: File => Set[String],
-		reversedMemberRefDeps: T => Set[File],
-		modifiedNames: Set[String],
-		log: Logger) extends (T => Set[File]) {
+		reversedMemberRefDeps: String => Set[File],
+		namesWithModifiedHashesInSource: NamesWithModifiedHashesInSource,
+		log: Logger) extends (String => Set[File]) {
 
-	private val cachedResults: collection.mutable.Map[T, Set[File]] = collection.mutable.Map.empty
+	private val cachedResults: collection.mutable.Map[String, Set[File]] = collection.mutable.Map.empty
+	private val modifiedNamesInClass =
+		namesWithModifiedHashesInSource.namesWithModifiedHashesInClass.map(x => x.className -> x).toMap
 
-	def apply(to: T): Set[File] = {
+	def apply(to: String): Set[File] = {
 		val dependent = reversedMemberRefDeps(to)
-		cachedResults.getOrElseUpdate(to, filteredDependencies(dependent))
+		val modifiedNames = modifiedNamesInClass(to).regularNames
+		cachedResults.getOrElseUpdate(to, filteredDependencies(modifiedNames, dependent))
 	}
 
-	private def filteredDependencies(dependent: Set[File]) = {
+	private def filteredDependencies(modifiedNames: Set[String], dependent: Set[File]) = {
 		dependent.filter {
 			case from if isJavaSource(from) =>
 				log.debug(s"Name hashing optimization doesn't apply to Java dependency: $from")

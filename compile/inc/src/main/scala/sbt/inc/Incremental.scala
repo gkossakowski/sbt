@@ -374,13 +374,13 @@ object Incremental
 			  if (!changedImplicits.isEmpty) {
 				log.debug(s"""|The $modifiedSrcFile source file has the following implicit definitions changed:
 						      |${changedImplicits.mkString("\n")}
-				              |All direct dependencies are invalidated.""")
+				              |All direct dependencies are invalidated.""".stripMargin)
 				memberRef
 			  } else {
 			  	log.debug(s"""|Invalidating direct member reference dependencies of transitively invalidated inheritance dependencies.
-						     |Scala dependencies with the following (className, usedNames) pairs are considered:
-			  			     |${changedNamesInSource.namesWithModifiedHashesInClass.map(x => (x.className, x.regularNames)).mkString("\n")}
-                             |All Java dependencies are considered.""")
+						      |Scala dependencies with the following (className, usedNames) pairs are considered:
+			  			      |${changedNamesInSource.namesWithModifiedHashesInClass.map(x => (x.className, x.regularNames)).mkString("\n")}
+                              |All Java dependencies are considered.""".stripMargin)
 				new NameHashFilteredDependencies2(usedNames, memberRef, changedNamesInSource, log)
 			  }
 

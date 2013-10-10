@@ -29,7 +29,7 @@ case class NamesWithModifiedHashesInClass(className: String, regularNames: Set[S
 	override def toString: String =
 	  s"""|NamesWithModifiedHashes(className = $className,
           |  regularNames = $regularNames,
-	      |  implicitNames = $implicitNames)"""
+	      |  implicitNames = $implicitNames)""".stripMargin
 }
 object NamesWithModifiedHashes {
 	def compareTwoNameHashesForSource(a: NameHashesForSource, b: NameHashesForSource):

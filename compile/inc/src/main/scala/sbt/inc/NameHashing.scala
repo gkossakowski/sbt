@@ -31,11 +31,9 @@ class NameHashing {
 	}
 
 	private def nameHashesForClass(locatedClass: Located[ClassLike]): NameHashesForClass = {
-		val location = locatedClass.location
-		val className = locationAsClassName(location)
-		val classLike = locatedClass.definition
-		val allDefs = extractPublicDefinitions(classLike)
-		val allDefsLocated = allDefs.map(d => Located(location, d)) :+ locatedClass
+		val className = locatedClassAsClassName(locatedClass)
+		val allDefs = extractPublicDefinitions(locatedClass)
+		val allDefsLocated = allDefs :+ locatedClass
 		val (implicitDefs, regularDefs) = allDefsLocated.partition(_.definition.modifiers.isImplicit)
 		val implicitNameHashes = nameHashesForLocatedDefinitions(implicitDefs)
 		val regularNameHashes = nameHashesForLocatedDefinitions(regularDefs)
@@ -43,7 +41,7 @@ class NameHashing {
 	}
 
 	private def nameHashesForLocatedDefinitions(locatedDefs: Iterable[Located[Definition]]): Iterable[NameHash] = {
-		val groupedBySimpleName = locatedDefs.groupBy(locatedDef => localName(locatedDef.definition.name))
+		val groupedBySimpleName = locatedDefs.groupBy(localName)
 		val hashes = groupedBySimpleName.mapValues(hashLocatedDefinitions)
 		hashes.toIterable.map({ case (name: String, hash: Int) => NameHash(name, hash) })
 	}
@@ -63,41 +61,39 @@ class NameHashing {
 				val packageName = {
 					val fullName = topLevelDef.name()
 					val lastDotIndex = fullName.lastIndexOf('.')
-					if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex-1)
+					if (lastDotIndex <= 0) "" else fullName.substring(0, lastDotIndex)
 				}
 				currentLocation = packageAsLocation(packageName)
 				visitDefinition(topLevelDef)
 			}
 		}
-		override def visitDefinition(d: Definition): Unit = {
-			d match {
-				case cl: xsbti.api.ClassLike =>
-					val savedLocation = currentLocation
-					currentLocation = classLikeAsLocation(currentLocation, cl)
-					super.visitDefinition(d)
-					currentLocation = savedLocation
-				case _ =>
-					super.visitDefinition(d)
-			}
+		override def visitClass0(c: ClassLike): Unit = {
+			val savedLocation = currentLocation
+			currentLocation = classLikeAsLocation(currentLocation, c)
+			super.visitClass0(c)
+			currentLocation = savedLocation
 		}
 	}
 
-	private def extractPublicDefinitions(classLike: ClassLike): Seq[Definition] = {
-		val visitor = new ExtractPublicDefinitions
-		visitor.visitClass(classLike)
+	private def extractPublicDefinitions(locatedClass: Located[ClassLike]): Seq[Located[Definition]] = {
+		val visitor = new ExtractPublicDefinitions(locatedClass)
+		visitor.visitClass(locatedClass.definition)
 		visitor.publicDefs
 	}
 
-	private class ExtractPublicDefinitions extends Visit {
-		val publicDefs = scala.collection.mutable.Buffer.empty[Definition]
-		override def visitDefinition(d: Definition): Unit = {
-			publicDefs += d
-			d match {
-				case cl: xsbti.api.ClassLike =>
-					// do not recurse
-				case _ =>
-					super.visitDefinition(d)
+	private class ExtractPublicDefinitions(locatedClass: Located[ClassLike]) extends LocatedVisit {
+		currentLocation = locatedClass.location
+		val publicDefs = scala.collection.mutable.Buffer.empty[Located[Definition]]
+		override def visitClass0(c: ClassLike): Unit = {
+			// process only the class we want to extract public definitions from
+			// in particular, do not recurse into other classes
+			if (c == locatedClass.definition) {
+				super.visitClass0(c)
 			}
+		}
+		override def visitDefinition(d: Definition): Unit = {
+			publicDefs += Located(currentLocation, d)
+			super.visitDefinition(d)
 		}
 	}
 
@@ -116,13 +112,22 @@ class NameHashing {
 		visitor.locatedClasses
 	}
 
+	private def localName(locatedDef: Located[Definition]): String = locatedDef.definition match {
+		case classLike: ClassLike =>
+			val classLocation = classLikeAsLocation(locatedDef.location, classLike)
+			val classSelector = classLocation.selectors.last
+			selectorToNameSegment(classSelector)
+		case otherDef =>
+			otherDef.name
+	}
+
 	private def localName(name: String): String = {
 	  val index = name.lastIndexOf('.') + 1
 	  name.substring(index)
 	}
 
 	private def packageAsLocation(pkg: String): Location = if (pkg != "") {
-		val selectors = pkg.split('.').map(name => Selector(name, TermName)).toSeq
+		val selectors = pkg.split('.').map(name => Selector(name, PackageName)).toSeq
 		Location(selectors: _*)
 	} else Location()
 
@@ -134,15 +139,17 @@ class NameHashing {
 		Location((prefix.selectors :+ selector): _*)
 	}
 
-	private def locationAsClassName(location: Location): String = {
-		def selectorToNameSegment(selector: Selector): String = {
-			val nameSuffix = selector.nameType match {
-				case TermName => "$"
-				case TypeName => ""
-			}
-			selector.name + nameSuffix
+	def selectorToNameSegment(selector: Selector): String = {
+		val nameSuffix = selector.nameType match {
+			case ObjectName | PackageObjectName => "$"
+			case TypeName | PackageName => ""
 		}
-		location.selectors.map(selectorToNameSegment).mkString(".")
+		selector.name + nameSuffix
+	}
+
+	private def locatedClassAsClassName(locatedClass: Located[ClassLike]): String = {
+		val classLocation = classLikeAsLocation(locatedClass.location, locatedClass.definition)
+		classLocation.selectors.map(selectorToNameSegment).mkString(".")
 	}
 }
 
@@ -160,14 +167,18 @@ object NameHashing {
 		val Empty = Location(Seq.empty: _*)
 	}
 	private case class Selector(name: String, nameType: NameType)
-	private sealed trait NameType
+	private sealed abstract class NameType
 	private object NameType {
 		import DefinitionType._
 		def apply(dt: DefinitionType): NameType = dt match {
 			case Trait | ClassDef => TypeName
-			case Module | PackageModule => TermName
+			case Module => ObjectName
+			case PackageModule => PackageObjectName
 		}
 	}
-	private case object TermName extends NameType
+	private sealed abstract class TermName extends NameType
+	private case object ObjectName extends TermName
+	private case object PackageObjectName extends TermName
+	private case object PackageName extends TermName
 	private case object TypeName extends NameType
 }

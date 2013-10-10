@@ -95,11 +95,11 @@ class NameHashingTest {
 		val parentB = simpleClass("Parent", barMethod)
 		val childA = {
 			val structure = new Structure(lzy(Array[Type](parentA.structure)), lzy(Array.empty[Definition]), lzy(Array.empty[Definition]))
-			simpleClass("Child", structure)
+			simpleClassLike("Child", structure, DefinitionType.ClassDef)
 		}
 		val childB = {
 			val structure = new Structure(lzy(Array[Type](parentB.structure)), lzy(Array.empty[Definition]), lzy(Array[Definition](barMethod)))
-			simpleClass("Child", structure)
+			simpleClassLike("Child", structure, DefinitionType.ClassDef)
 		}
 		val parentANameHashes = nameHashesForClass(parentA)
 		val parentBNameHashes = nameHashesForClass(parentB)
@@ -151,6 +151,68 @@ class NameHashingTest {
 		assertNameHashNotEqualForRegularName("bar", nameHashes1, nameHashes2)
 	}
 
+	/**
+	 * Checks if name hashes are properly assigned to an enclosing class.
+	 * For example, if we have:
+	 *
+	 * package a
+	 * class A {
+	 *   class B1 {
+	 *     def b1: Int
+	 *   }
+	 *   object C1 {
+	 *     class X
+	 *     class Y
+	 *   }
+	 * }
+	 * object A {
+	 *   class B2
+	 * }
+	 *
+	 * we should get the following names in name-hash pairs:
+	 *
+	 * nameHashes(a.A): A, B1, C1$
+	 * nameHashes(a.A.B1): B1, b1
+	 * nameHashes(a.A.C1$): C1$, X, Y
+	 * nameHashes(a.A.C1$.X): X
+	 * nameHashes(a.A.C1$.Y): Y
+	 * nameHashes(a.A$): A$, B2
+	 * nameHashes(a.A$.B2): B2
+	 *
+	 * Note that the name of enclosing class is always included in
+	 * name-hash pairs.
+	 */
+	@Test
+	def nestedDefinitions: Unit = {
+		/** def foo: { bar: Int } */
+		val b1Method = {
+			new Def(Array.empty, intTpe, Array.empty, "b1", publicAccess, defaultModifiers, Array.empty)
+		}
+		val classB1 = simpleClass("a.A.B1", b1Method)
+		val classX = simpleClass("a.A.C1.X")
+		val classY = simpleClass("a.A.C1.Y")
+		val objectC1 = simpleObject("a.A.C1", classX, classY)
+		val classA = simpleClass("a.A", classB1, objectC1)
+		val classB2 = simpleClass("a.A.B2")
+		val objectA = simpleObject("a.A", classB2)
+		val sourceAPI = new SourceAPI(Array(new Package("a")), Array(classA, objectA))
+
+		val nameHashing = new NameHashing
+		val nameHashes = nameHashing.nameHashesForSource(sourceAPI).nameHashesForClassName
+		def getRegularNames(nameHash: NameHashesForClass): Set[String] =
+			nameHash.regularMembers.map(_.name)
+		val names = nameHashes.map(nameHash => nameHash.className -> getRegularNames(nameHash)).toMap
+		val classNames = names.keySet
+		assertEquals(Set("a.A", "a.A$", "a.A.B1", "a.A.C1$", "a.A.C1$.X", "a.A.C1$.Y", "a.A$.B2"), classNames)
+		assertEquals(Set("A", "B1", "C1$"), names("a.A"))
+		assertEquals(Set("B1", "b1"), names("a.A.B1"))
+		assertEquals(Set("C1$", "X", "Y"), names("a.A.C1$"))
+		assertEquals(Set("X"), names("a.A.C1$.X"))
+		assertEquals(Set("Y"), names("a.A.C1$.Y"))
+		assertEquals(Set("A$", "B2"), names("a.A$"))
+		assertEquals(Set("B2"), names("a.A$.B2"))
+	}
+
 	private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashesForClass,
 			nameHashes2: NameHashesForClass): Unit = {
 		val nameHash1 = nameHashForRegularName(nameHashes1, name)
@@ -186,11 +248,16 @@ class NameHashingTest {
 
 	private def simpleClass(name: String, defs: Definition*): ClassLike = {
 		val structure = simpleStructure(defs: _*)
-		simpleClass(name, structure)
+		simpleClassLike(name, structure, DefinitionType.ClassDef)
 	}
 
-	private def simpleClass(name: String, structure: Structure): ClassLike = {
-		new ClassLike(DefinitionType.ClassDef, lzy(emptyType), lzy(structure), Array.empty, Array.empty, name, publicAccess, defaultModifiers, Array.empty)
+	private def simpleObject(name: String, defs: Definition*): ClassLike = {
+		val structure = simpleStructure(defs: _*)
+		simpleClassLike(name, structure, DefinitionType.Module)
+	}
+
+	private def simpleClassLike(name: String, structure: Structure, defType: DefinitionType): ClassLike = {
+		new ClassLike(defType, lzy(emptyType), lzy(structure), Array.empty, Array.empty, name, publicAccess, defaultModifiers, Array.empty)
 	}
 
 	private val emptyType = new EmptyType

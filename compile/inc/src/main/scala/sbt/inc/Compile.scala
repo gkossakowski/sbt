@@ -161,7 +161,9 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	def api(sourceFile: File, source: SourceAPI) {
 		import xsbt.api.{APIUtil, HashAPI}
 		if (APIUtil.isScalaSourceName(sourceFile.getName) && APIUtil.hasMacro(source)) macroSources += sourceFile
-        publicNameHashes(sourceFile) = (new NameHashing).nameHashesForSource(source)
+		val extractedNameHashes = (new NameHashing).nameHashesForSource(source)
+		log.debug(s"Extracted the following name hashes for $sourceFile:\n${extractedNameHashes.nameHashesForClassName.mkString("\n")}")
+        publicNameHashes(sourceFile) = extractedNameHashes
 		val shouldMinimize = !Incremental.apiDebug(options)
 		val savedSource = if (shouldMinimize) APIUtil.minimize(source) else source
 		apis(sourceFile) = (HashAPI(source), savedSource)

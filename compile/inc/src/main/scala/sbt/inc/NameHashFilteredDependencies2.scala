@@ -11,8 +11,12 @@ class NameHashFilteredDependencies2(
 		log: Logger) extends (String => Set[File]) {
 
 	private val cachedResults: collection.mutable.Map[String, Set[File]] = collection.mutable.Map.empty
-	private val modifiedNamesInClass =
-		namesWithModifiedHashesInSource.namesWithModifiedHashesInClass.map(x => x.className -> x).toMap
+	private val modifiedNamesInClass = {
+		val inClass = namesWithModifiedHashesInSource.namesWithModifiedHashesInClass
+		def emptyModifiedNames(className: String) = NamesWithModifiedHashesInClass(className, Set.empty, Set.empty)
+		val modifiedNamesMap = inClass.map(x => x.className -> x).toMap
+		modifiedNamesMap.withDefault(emptyModifiedNames)
+	}
 
 	def apply(to: String): Set[File] = {
 		val dependent = reversedMemberRefDeps(to)

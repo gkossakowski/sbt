@@ -32,6 +32,11 @@ class ScalaCompilerForUnitTesting {
 		analysisCallback.usedNames(tempSrcFile).toSet
 	}
 
+	def extractDeclaredClassesFromSrc(src: String): Set[String] = {
+		val (Seq(tempSrcFile), analysisCallback) = compileSrcs(src)
+		analysisCallback.declaredClasses(tempSrcFile).toSet
+	}
+
 	/**
 	 * Extract used names from src provided as the second argument.
 	 *
@@ -118,6 +123,7 @@ class ScalaCompilerForUnitTesting {
 		import scala.collection.mutable.{Map, Set}
 		val apis: Map[File, SourceAPI] = scala.collection.mutable.Map.empty
 		val usedNames: Map[File, Set[String]] = Map.empty
+		val declaredClasses: Map[File, Set[String]] = Map.empty
 		def beginSource(source: File): Unit = ()
 		def sourceDependency(dependsOn: File, source: File, publicInherited: Boolean): Unit = ()
 		def classNameDependency(className: String, source: File, publicInherited: Boolean): Unit = ()
@@ -130,6 +136,10 @@ class ScalaCompilerForUnitTesting {
 		def usedName(srcFile: File, name: String): Unit = {
 			val usedNamesInSrcFile = usedNames.getOrElseUpdate(srcFile, Set.empty)
 			usedNamesInSrcFile += name
+		}
+		def declaredClass(srcFile: File, className: String): Unit = {
+			val declaredClassesInSrcFile = declaredClasses.getOrElseUpdate(srcFile, Set.empty)
+			declaredClassesInSrcFile += className
 		}
 		def problem(what: String, pos: Position, msg: String, severity: Severity, reported: Boolean): Unit = ()
 	}

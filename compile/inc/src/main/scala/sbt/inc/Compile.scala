@@ -75,6 +75,7 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	private[this] val binaryDeps = new HashMap[File, Set[File]]
 		// source file to set of generated (class file, class name)
 	private[this] val classes = new HashMap[File, Set[(File, String)]]
+	private[this] val declaredClasses = new HashMap[File, Set[String]]
 		// generated class file to its source file
 	private[this] val classToSource = new HashMap[File, File]
 		// all internal source depenencies, including direct and inherited
@@ -158,6 +159,10 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		classToSource.put(module, source)
 	}
 
+	def declaredClass(source: File, className: String): Unit = {
+		add(declaredClasses, source, className)
+	}
+
 	def api(sourceFile: File, source: SourceAPI) {
 		import xsbt.api.{APIUtil, HashAPI}
 		if (APIUtil.isScalaSourceName(sourceFile.getName) && APIUtil.hasMacro(source)) macroSources += sourceFile
@@ -174,7 +179,8 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	def endSource(sourcePath: File): Unit =
 		assert(apis.contains(sourcePath))
 
-	def get: Analysis = addUsedNames( addCompilation( addExternals( addBinaries( addProducts( addSources(Analysis.Empty) ) ) ) ) )
+	def get: Analysis =
+		addDeclaredClasses( addUsedNames(addCompilation( addExternals( addBinaries( addProducts( addSources(Analysis.Empty) ) ) ) ) ) )
 	def addProducts(base: Analysis): Analysis = addAll(base, classes) { case (a, src, (prod, name)) => a.addProduct(src, prod, current product prod, name ) }
 	def addBinaries(base: Analysis): Analysis = addAll(base, binaryDeps)( (a, src, bin) => a.addBinaryDep(src, bin, binaryClassName(bin), current binary bin) )
 	def addSources(base: Analysis): Analysis =
@@ -197,6 +203,9 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	def addCompilation(base: Analysis): Analysis = base.copy(compilations = base.compilations.add(compilation))
 	def addUsedNames(base: Analysis): Analysis = (base /: usedNames) { case (a, (src, names)) =>
 	  (a /: names) { case (a, name) => a.copy(relations = a.relations.addUsedName(src, name)) }
+	}
+	def addDeclaredClasses(base: Analysis): Analysis = addAll(base, declaredClasses) { case (a, src, className) =>
+		a.copy(relations = a.relations.addDeclaredClass(src, className))
 	}
 
 	def addAll[A,B](base: Analysis, m: Map[A, Set[B]])( f: (Analysis, A, B) => Analysis): Analysis =

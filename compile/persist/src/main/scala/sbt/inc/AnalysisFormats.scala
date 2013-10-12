@@ -101,12 +101,14 @@ object AnalysisFormats
 
 	implicit def relationsFormat(implicit prodF: Format[RFF], binF: Format[RFF], directF: Format[SourceDependencies],
 			publicInherited: Format[SourceDependencies], memberRefF: Format[SourceDependenciesByClassName],
-			inheritanceF: Format[SourceDependenciesByClassName], csF: Format[RFS], namesF: Format[RFS]): Format[Relations] =
-		asProduct8[Relations, RFF, RFF, SourceDependencies, SourceDependencies,
-			SourceDependenciesByClassName, SourceDependenciesByClassName, RFS, RFS](
-				(a,b,c,d,e,f,g,h) => Relations.make(a,b,c,d,e,f,g,h) )(
-						rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.memberRef, rs.inheritance, rs.classes, rs.names) )(
-								prodF, binF, directF, publicInherited, memberRefF, inheritanceF, csF, namesF)
+			inheritanceF: Format[SourceDependenciesByClassName], csF: Format[RFS], namesF: Format[RFS],
+			declaredClassesF: Format[RFS]): Format[Relations] =
+		asProduct9[Relations, RFF, RFF, SourceDependencies, SourceDependencies,
+			SourceDependenciesByClassName, SourceDependenciesByClassName, RFS, RFS, RFS](
+				(a,b,c,d,e,f,g,h,j) => Relations.make(a,b,c,d,e,f,g,h,j) )(
+						rs => (rs.srcProd, rs.binaryDep, rs.direct, rs.publicInherited, rs.memberRef, rs.inheritance,
+								rs.classes, rs.names, rs.declaredClasses) )(
+								prodF, binF, directF, publicInherited, memberRefF, inheritanceF, csF, namesF, declaredClassesF)
 
 	implicit def relationsSourceFormat(implicit internalFormat: Format[Relation[File, File]], externalFormat: Format[Relation[File,String]]): Format[SourceDependencies] =
 		asProduct2[SourceDependencies, RFF, RFS]( (a, b) => Relations.makeSourceDependencies(a,b))( rs => (rs.internal, rs.external))

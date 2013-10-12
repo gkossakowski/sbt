@@ -99,7 +99,7 @@ object Incremental
 	// Package objects are fragile: if they inherit from an invalidated source, get "class file needed by package is missing" error
 	//  This might be too conservative: we probably only need package objects for packages of invalidated sources.
 	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] = {
-		val invalidatedClassNames = invalidated.flatMap(relations.classNames)
+		val invalidatedClassNames = invalidated.flatMap(relations.declaredClassNames)
 		invalidatedClassNames flatMap relations.inheritance.internal.reverse filter { _.getName == "package.scala" }
 	}
 
@@ -216,14 +216,14 @@ object Incremental
 	def invalidateIncremental(previous: Relations, recompiledRelations: Relations, apis: APIs, changes: APIChanges[File], recompiledSources: Set[File], transitive: Boolean, log: Logger): Set[File] =
 	{
 		val memberRefReversed: File => Set[File] = { srcFile =>
-			val classNames = previous.classNames(srcFile)
+			val classNames = previous.declaredClassNames(srcFile)
 			classNames flatMap { className =>
 				recompiledRelations.memberRef.internal.reverse(className)
 			}
 		}
 		//val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
 		val dependsOnSrc: File => Set[File] = { srcFile =>
-			val classNames = previous.classNames(srcFile)
+			val classNames = previous.declaredClassNames(srcFile)
 			val byInheritance = classNames flatMap { className =>
 				recompiledRelations.inheritance.internal.reverse(className)
 			}
@@ -312,7 +312,7 @@ object Incremental
 		// Get the direct dependencies of all sources transitively invalidated by inheritance
 		log.debug("Getting direct dependencies of all sources transitively invalidated by inheritance.")
 		val directA = transitiveInheritance flatMap { srcFile =>
-			val definedClassNamesInSrcFile = relations.classNames(srcFile)
+			val definedClassNamesInSrcFile = relations.declaredClassNames(srcFile)
 			definedClassNamesInSrcFile flatMap memberRefDepsInternal
 		}
 		// Get the sources that directly depend on externals.  This includes non-inheritance dependencies and is not transitive.
@@ -339,7 +339,7 @@ object Incremental
 
 	private def invalidateByInheritance(previousRelations: Relations, recompiledRelations: Relations, modified: File, log: Logger): Set[File] = {
 		val inheritanceDeps: File => Set[File] = { srcFile =>
-			val definedClassNamesInSrcFile = previousRelations.classNames(srcFile)
+			val definedClassNamesInSrcFile = previousRelations.declaredClassNames(srcFile)
 			definedClassNamesInSrcFile flatMap recompiledRelations.inheritance.internal.reverse
 		}
 		log.debug(s"Invalidating (transitively) by inheritance from $modified...")
@@ -392,7 +392,7 @@ object Incremental
 		val transitiveInheritance = invalidateByInheritance(previousRelations, recompiledRelations, apiChange.modified, log)
 		val memberRefDeps = memberRefDepependencies(recompiledRelations.memberRef.internal.reverse, recompiledRelations.names.forwardMap, apiChange, log)
 		val memberRef = transitiveInheritance flatMap { srcFile =>
-			val definedClassNamesInSrcFile = previousRelations.classNames(srcFile)
+			val definedClassNamesInSrcFile = previousRelations.declaredClassNames(srcFile)
 			definedClassNamesInSrcFile flatMap memberRefDeps
 		}
 		val all = transitiveInheritance ++ memberRef

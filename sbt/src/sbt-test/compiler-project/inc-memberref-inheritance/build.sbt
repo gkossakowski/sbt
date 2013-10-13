@@ -33,6 +33,6 @@ TaskKey[Unit]("check-compilations") <<= (compile in Compile, scalaSource in Comp
   // and by inheritance on A.scala
   // X.scala is not recompiled altough it depends directly on B.scala, it's not invalidated because
   // only the name `foo` has been changed in A.scala and X.scala doesn't use name `foo`
-  recompiledFilesInIteration(2, Set("A.scala", "B.scala", "C.scala", "D.scala"))
+  recompiledFilesInIteration(2, Set("A.scala", "AA.scala", "B.scala", "BBa.scala", "BBb.scala", "C.scala", "D.scala"))
   assert(allCompilations.size == 3)
 }

@@ -22,12 +22,16 @@ public interface AnalysisCallback
 	* be passed as class dependencies to the classDependency method.
 	* If <code>publicInherited</code> is true, this dependency is a result of inheritance by a
 	* template accessible outside of the source file. */
-	public void classNameDependency(String className, File source, boolean publicInherited);
+	//public void classNameDependency(String className, File source, boolean publicInherited);
+	public void sourceMemberRefDependency(String className, File source);
+	public void sourceInheritanceDependency(String targetClassName, File source, String sourceClassName);
 	/** Called to indicate that the source file <code>source</code> depends on the top-level
 	* class named <code>name</code> from class or jar file <code>binary</code>.
 	* If <code>publicInherited</code> is true, this dependency is a result of inheritance by a
 	* template accessible outside of the source file. */
 	public void binaryDependency(File binary, String name, File source, boolean publicInherited);
+	public void binaryMemberRefDependency(File binary, String name, File source);
+	public void binaryInheritanceDependency(File binary, String targetClassName, File source, String sourceClassName);
 	/** Called to indicate that the source file <code>source</code> produces a class file at
 	* <code>module</code> contain class <code>name</code>.*/
 	public void generatedClass(File source, File module, String name);

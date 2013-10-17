@@ -15,7 +15,7 @@ import java.net.URL
 
 private[sbt] object Analyze
 {
-	def apply[T](newClasses: Seq[File], sources: Seq[File], log: Logger)(analysis: xsbti.AnalysisCallback, loader: ClassLoader, readAPI: (File,Seq[Class[_]]) => Set[String])
+	def apply[T](newClasses: Seq[File], sources: Seq[File], log: Logger)(analysis: xsbti.AnalysisCallback, loader: ClassLoader, readAPI: (File,Seq[Class[_]]) => Set[(String,String)])
 	{
 		val sourceMap = sources.toSet[File].groupBy(_.getName)
 
@@ -44,8 +44,14 @@ private[sbt] object Analyze
 		{
 			val publicInherited = readAPI(source, classFiles.toSeq.flatMap(c => load(c.className, Some("Error reading API from class file") )))
 
-			def processDependency(tpe: String, inherited: Boolean)
+			/**
+			 * The following invariant must hold:
+			 * inherited=true => from != null
+			 * inherited=false => from == null
+			 */
+			def processDependency(tpe: String, inherited: Boolean, from: String)
 			{
+				assert((inherited && from != null) || (!inherited && from == null), (inherited, from))
 				trapAndLog(log)
 				{
 					for (url <- Option(loader.getResource(tpe.replace('.', '/') + ClassExt)); file <- urlAsFile(url, log))
@@ -59,19 +65,27 @@ private[sbt] object Analyze
 							{
 								case Some(dependsOn) =>
 									analysis.sourceDependency(dependsOn, source, inherited)
-									analysis.classNameDependency(tpe, source, inherited)
+									if (inherited)
+										analysis.sourceInheritanceDependency(tpe, source, from)
+									else
+										analysis.sourceMemberRefDependency(tpe, source)
 								case None => analysis.binaryDependency(file, tpe, source, inherited)
 							}
 						}
 					}
 				}
 			}
-			def processDependencies(tpes: Iterable[String], inherited: Boolean): Unit = tpes.foreach(tpe => processDependency(tpe, inherited))
+			def processMemberRefDependencies(tpes: Iterable[String]): Unit = tpes.foreach(tpe => processDependency(tpe, false, null))
+			def processInheritanceDependencies(deps: Iterable[(String,String)]): Unit = deps.foreach {
+				case (from, to) => processDependency(to, true, from)
+			}
+
 			def declaredClass(className: String): Unit = analysis.declaredClass(source, className)
 			val typesInSource = classFiles.flatMap(_.types).toSet
-			val notInherited = typesInSource -- publicInherited
-			processDependencies(notInherited, false)
-			processDependencies(publicInherited, true)
+			val publicInheritedTargets = publicInherited.map(_._2)
+			val notInherited = typesInSource -- publicInheritedTargets
+			processMemberRefDependencies(notInherited)
+			processInheritanceDependencies(publicInherited)
 			typesInSource.foreach(declaredClass)
 			analysis.endSource(source)
 		}

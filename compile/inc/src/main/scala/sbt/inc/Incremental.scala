@@ -100,7 +100,9 @@ object Incremental
 	//  This might be too conservative: we probably only need package objects for packages of invalidated sources.
 	private[this] def invalidatedPackageObjects(invalidated: Set[File], relations: Relations): Set[File] = {
 		val invalidatedClassNames = invalidated.flatMap(relations.declaredClassNames)
-		invalidatedClassNames flatMap relations.inheritance.internal.reverse filter { _.getName == "package.scala" }
+		(invalidatedClassNames flatMap relations.inheritance.internal.reverse).flatMap(relations.declaresClass) filter { srcFile =>
+			srcFile.getName == "package.scala"
+		}
 	}
 
 	/**
@@ -224,11 +226,12 @@ object Incremental
 		//val memberRefDepsRevesredAndFiltered = new NameHashFilteredDependencies(previous.names, memberRefReversed, changes.modifiedNames, log)
 		val dependsOnSrc: File => Set[File] = { srcFile =>
 			val classNames = previous.declaredClassNames(srcFile)
-			val byInheritance = classNames flatMap { className =>
+			val byInheritanceClassNames = classNames flatMap { className =>
 				recompiledRelations.inheritance.internal.reverse(className)
 			}
+			val byInheritanceSrcFiles = byInheritanceClassNames.flatMap(previous.declaresClass)
 			val byMemberRef = memberRefReversed(srcFile) //memberRefDepsRevesredAndFiltered(to)
-			byInheritance ++ byMemberRef
+			byInheritanceSrcFiles ++ byMemberRef
 		}
 		val propagated =
 			if(transitive)
@@ -302,8 +305,11 @@ object Incremental
 		val byExternalInheritance = externalInheritanceR.reverse(modified)
 		log.debug(s"Files invalidated by inheriting from (external) $modified: $byExternalInheritance; now invalidating by inheritance (internally).")
 		val transitiveInheritance = byExternalInheritance flatMap { invalidatedExternallyByInheritance =>
+			val invalidatedSrcFile = relations.declaresClass(invalidatedExternallyByInheritance)
 			// we are still in initial stage of invalidation so previous and recompiled relations are the same
-			invalidateByInheritance(relations, relations, invalidatedExternallyByInheritance, log)
+			invalidatedSrcFile.toSet flatMap { (file: File) =>
+				invalidateByInheritance(relations, relations, file, log)
+			}
 		}
 		val memberRefDepsInternal = memberRefDepependencies(relations.memberRef.internal.reverse,
 				relations.names.forwardMap, externalAPIChange, log)
@@ -340,7 +346,8 @@ object Incremental
 	private def invalidateByInheritance(previousRelations: Relations, recompiledRelations: Relations, modified: File, log: Logger): Set[File] = {
 		val inheritanceDeps: File => Set[File] = { srcFile =>
 			val definedClassNamesInSrcFile = previousRelations.declaredClassNames(srcFile)
-			definedClassNamesInSrcFile flatMap recompiledRelations.inheritance.internal.reverse
+			val dependentClassNames = definedClassNamesInSrcFile flatMap recompiledRelations.inheritance.internal.reverse
+			dependentClassNames.flatMap(previousRelations.declaresClass)
 		}
 		log.debug(s"Invalidating (transitively) by inheritance from $modified...")
 		val transitiveInheritance = transitiveDeps(Set(modified), log)(inheritanceDeps)

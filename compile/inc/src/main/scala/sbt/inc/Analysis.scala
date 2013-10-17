@@ -23,9 +23,11 @@ trait Analysis
 	    compilations: Compilations = compilations): Analysis
 
 	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File],
-			memberRefInternal: Iterable[String], inheritanceInternal: Iterable[String], info: SourceInfo): Analysis
+			memberRefInternal: Iterable[String], inheritanceInternal: Map[String, Iterable[String]], info: SourceInfo): Analysis
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis
-	def addExternalDep(src: File, dep: String, api: Source, inherited: Boolean): Analysis
+//	def addExternalDep(src: File, dep: String, api: Source, inherited: Boolean): Analysis
+	def addExternalMemberRefDep(src: File, dep: String, api: Source): Analysis
+	def addExternalInheritanceDep(src: File, className: String, dep: String, api: Source): Analysis
 	def addProduct(src: File, product: File, stamp: Stamp, name: String): Analysis
 
 	def groupBy[K](f: (File => K)): Map[K, Analysis]
@@ -80,17 +82,26 @@ private class MAnalysis(val stamps: Stamps, val apis: APIs, val relations: Relat
 	  new MAnalysis(stamps, apis, relations, infos, compilations)
 
 	def addSource(src: File, api: Source, stamp: Stamp, directInternal: Iterable[File], inheritedInternal: Iterable[File],
-			memberRefInternal: Iterable[String], inheritanceInternal: Iterable[String], info: SourceInfo): Analysis = {
-		val relationsWithSrcDeps = relations.addInternalSrcDeps(src, directInternal, inheritedInternal)
-		val relationsWithClassNameDeps = relationsWithSrcDeps.addInternalClassNameDeps(src, memberRefInternal, inheritanceInternal)
-		copy( stamps.markInternalSource(src, stamp), apis.markInternalSource(src, api), relationsWithClassNameDeps, infos.add(src, info) )
+			memberRefInternal: Iterable[String], inheritanceInternal: Map[String, Iterable[String]], info: SourceInfo): Analysis = {
+		val r1 = relations.addInternalSrcDeps(src, directInternal, inheritedInternal)
+		val r2 = r1.addInternalMemberRefDeps(src, memberRefInternal)
+		val r3 = inheritanceInternal.foldLeft(r2) { case (r, (className, dependsOn)) =>
+			r.addInternalInheritanceDeps(className, dependsOn)
+		}
+		copy( stamps.markInternalSource(src, stamp), apis.markInternalSource(src, api), r3, infos.add(src, info) )
 	}
 
 	def addBinaryDep(src: File, dep: File, className: String, stamp: Stamp): Analysis =
 		copy( stamps.markBinary(dep, className, stamp), apis, relations.addBinaryDep(src, dep), infos )
 
-	def addExternalDep(src: File, dep: String, depAPI: Source, inherited: Boolean): Analysis =
-		copy( stamps, apis.markExternalAPI(dep, depAPI), relations.addExternalDep(src, dep, inherited), infos )
+//	def addExternalDep(src: File, dep: String, depAPI: Source, inherited: Boolean): Analysis =
+//		copy( stamps, apis.markExternalAPI(dep, depAPI), relations.addExternalDep(src, dep, inherited), infos )
+
+	def addExternalMemberRefDep(src: File, dep: String, depAPI: Source): Analysis =
+		copy( stamps, apis.markExternalAPI(dep, depAPI), relations.addExternalMemberRefDep(src, dep), infos )
+
+	def addExternalInheritanceDep(src: File, className: String, dep: String, depAPI: Source): Analysis =
+		copy( stamps, apis.markExternalAPI(dep, depAPI), relations.addExternalInheritanceDep(src, className, dep), infos )
 
 	def addProduct(src: File, product: File, stamp: Stamp, name: String): Analysis =
 		copy( stamps.markProduct(product, stamp), apis, relations.addProduct(src, product, name), infos )

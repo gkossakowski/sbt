@@ -46,6 +46,11 @@ trait Relations
 	 */
 	def declaredClassNames(src: File): Set[String]
 
+	/**
+	 * Source file that declares class with fully qualified name `className`.
+	 */
+	def declaresClass(className: String): Option[File]
+
 	/** The classes that were generated for source file `src`. */
 	def products(src: File): Set[File]
 	/** The source files that generated class file `prod`.  This is typically a set containing a single file. */
@@ -76,10 +81,23 @@ trait Relations
 	/** Records internal source file `src` as generating class file `prod` with top-level class `name`. */
 	def addProduct(src: File, prod: File, name: String): Relations
 
-	/** Records internal source file `src` as depending on class `dependsOn` in an external source file.
-	* If `inherited` is true, this dependency is recorded as coming from a public template in `src` extending something in `dependsOn` (an inheritance dependency).
-	* Whatever the value of `inherited`, the dependency is also recorded as a direct dependency. */
-	def addExternalDep(src: File, dependsOn: String, inherited: Boolean): Relations
+//	/** Records internal source file `src` as depending on class `dependsOn` in an external source file.
+//    * If `inherited` is true, this dependency is recorded as coming from a public template in `src` extending something in `dependsOn` (an inheritance dependency).
+//	* Whatever the value of `inherited`, the dependency is also recorded as a direct dependency. */
+//	def addExternalDep(src: File, dependsOn: String, inherited: Boolean): Relations
+
+	/**
+	 * Records internal source file `src` as depending on class `dependsOn` in an external source file.
+	 */
+	def addExternalMemberRefDep(src: File, dependsOn: String): Relations
+
+	/**
+	 * Records internal class named `className` defined in  internal source file `src` as depending on class
+	 * `dependsOn` in an external source file by inheritance.
+	 * The dependency is recorded as coming from a public template `className` extending `dependsOn` (an inheritance dependency).
+	 * Each inheritance dependency is also recorded as a member reference dependency.
+	 */
+	def addExternalInheritanceDep(src: File, className: String, dependsOn: String): Relations
 
 	/** Records internal source file `src` depending on a dependency binary dependency `dependsOn`.*/
 	def addBinaryDep(src: File, dependsOn: File): Relations
@@ -93,7 +111,9 @@ trait Relations
 	/** Records internal source file `src` as having direct dependencies on internal class names `directDependsOn`
 	* and inheritance dependencies on `inheritedDependsOn`.  Everything in `inheritedDependsOn` must be included in `directDependsOn`;
 	* this method does not automatically record direct dependencies like `addExternalDep` does.*/
-	def addInternalClassNameDeps(src: File, directDependsOn: Iterable[String], inheritedDependsOn: Iterable[String]): Relations
+	def addInternalMemberRefDeps(src: File, dependsOn: Iterable[String]): Relations
+
+	def addInternalInheritanceDeps(className: String, dependsOn: Iterable[String]): Relations
 
 	def addUsedName(src: File, name: String): Relations
 
@@ -213,14 +233,16 @@ object Relations
 		}
 	}
 
-	final class SourceDependenciesByInheritance private[sbt](val internal: Relation[File,String], val external: Relation[File,String]) {
-		def addInternal(source: File, dependsOn: Iterable[String]): SourceDependenciesByInheritance =
-			new SourceDependenciesByInheritance(internal + (source, dependsOn), external)
-		def addExternal(source: File, dependsOn: String): SourceDependenciesByInheritance = new SourceDependenciesByInheritance(internal, external + (source, dependsOn))
+	final class SourceDependenciesByInheritance private[sbt](val internal: Relation[String,String], val external: Relation[String,String]) {
+		def addInternal(className: String, dependsOn: Iterable[String]): SourceDependenciesByInheritance =
+			new SourceDependenciesByInheritance(internal + (className, dependsOn), external)
+		def addExternal(className: String, dependsOn: String): SourceDependenciesByInheritance =
+			new SourceDependenciesByInheritance(internal, external + (className, dependsOn))
 		/** Drops all dependency mappings from `sources`.  This will not remove mappings to them (that is, where they are dependencies).*/
-		def --(sources: Iterable[File]): SourceDependenciesByInheritance = new SourceDependenciesByInheritance(internal -- sources, external -- sources)
+		def --(classNames: Iterable[String]): SourceDependenciesByInheritance =
+			new SourceDependenciesByInheritance(internal -- classNames, external -- classNames)
 		def ++(o: SourceDependenciesByInheritance): SourceDependenciesByInheritance = new SourceDependenciesByInheritance(internal ++ o.internal, external ++ o.external)
-		def groupBySource[K](f: File => K): Map[K, SourceDependenciesByInheritance] = {
+		def groupBySource[K](f: String => K): Map[K, SourceDependenciesByInheritance] = {
 			val i = internal.groupBy { case (a,b) => f(a) }
 			val e = external.groupBy { case (a,b) => f(a) }
 			val pairs = for( k <- i.keySet ++ e.keySet ) yield
@@ -232,15 +254,16 @@ object Relations
 	private[sbt] def getOrEmpty[A,B,K](m: Map[K, Relation[A,B]], k: K): Relation[A,B] = m.getOrElse(k, Relation.empty)
 
 	private[this] lazy val e = Relation.empty[File, File]
-	private[this] lazy val estr = Relation.empty[File, String]
-	private[this] lazy val es = new SourceDependencies(e, estr)
-	private[this] lazy val esbmr = new SourceDependenciesByMemberRef(estr, estr)
+	private[this] lazy val efstr = Relation.empty[File, String]
+	private[this] lazy val estr = Relation.empty[String, String]
+	private[this] lazy val es = new SourceDependencies(e, efstr)
+	private[this] lazy val esbmr = new SourceDependenciesByMemberRef(efstr, efstr)
 	private[this] lazy val esbi = new SourceDependenciesByInheritance(estr, estr)
 
 	def emptySourceDependencies: SourceDependencies = es
 	def emptySourceDependenciesByMemberRef: SourceDependenciesByMemberRef = esbmr
 	def emptySourceDependenciesByInheritance: SourceDependenciesByInheritance = esbi
-	def empty: Relations = new MRelations(e, e, es, es, esbmr, esbi, estr, estr, estr)
+	def empty: Relations = new MRelations(e, e, es, es, esbmr, esbi, efstr, efstr, efstr)
 
 	def make(srcProd: Relation[File, File], binaryDep: Relation[File, File],
 			direct: SourceDependencies, publicInherited: SourceDependencies,
@@ -252,7 +275,7 @@ object Relations
 	def makeSourceDependencies(internal: Relation[File,File], external: Relation[File,String]): SourceDependencies = new SourceDependencies(internal, external)
 	def makeSourceDependenciesByMemberRef(internal: Relation[File,String], external: Relation[File,String]):
 		SourceDependenciesByMemberRef = new SourceDependenciesByMemberRef(internal, external)
-	def makeSourceDependenciesByInheritance(internal: Relation[File,String], external: Relation[File,String]):
+	def makeSourceDependenciesByInheritance(internal: Relation[String,String], external: Relation[String,String]):
 	  SourceDependenciesByInheritance = new SourceDependenciesByInheritance(internal, external)
 }
 /**
@@ -293,6 +316,11 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 	def definesClass(name: String): Set[File] = classes.reverse(name)
 
 	def declaredClassNames(src: File): Set[String] = declaredClasses.forward(src)
+	def declaresClass(className: String): Option[File] = {
+		val declaringSrcs = declaredClasses.reverse(className)
+		assert(declaringSrcs.size <= 1, s"className = $className, declaringSrcs = $declaringSrcs")
+		declaringSrcs.headOption
+	}
 
 	def products(src: File): Set[File] = srcProd.forward(src)
 	def produced(prod: File): Set[File] = srcProd.reverse(prod)
@@ -313,12 +341,23 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 				memberRef = memberRef, inheritance = inheritance,
 				classes + (src, name), names, declaredClasses)
 
-	def addExternalDep(src: File, dependsOn: String, inherited: Boolean): Relations = {
+//	def addExternalDep(src: File, dependsOn: String, inherited: Boolean): Relations = {
+// 		val newDirect = direct.addExternal(src, dependsOn)
+// 		val newPublicInherited = if(inherited) publicInherited.addExternal(src, dependsOn) else publicInherited
+//-		new MRelations( srcProd, binaryDep, newDirect, newPublicInherited, newMemberRef, newInheritance, classes,
+//	}
+
+	def addExternalMemberRefDep(src: File, dependsOn: String): Relations = {
 		val newDirect = direct.addExternal(src, dependsOn)
-		val newPublicInherited = if(inherited) publicInherited.addExternal(src, dependsOn) else publicInherited
 		val newMemberRef = memberRef.addExternal(src, dependsOn)
-		val newInheritance = if(inherited) inheritance.addExternal(src, dependsOn) else inheritance
-		new MRelations( srcProd, binaryDep, newDirect, newPublicInherited, newMemberRef, newInheritance, classes,
+		new MRelations( srcProd, binaryDep, newDirect, publicInherited, newMemberRef, inheritance, classes,
+				names, declaredClasses)
+	}
+
+	def addExternalInheritanceDep(src: File, className: String, dependsOn: String): Relations = {
+		val newPublicInherited = publicInherited.addExternal(src, dependsOn)
+		val newInheritance = inheritance.addExternal(className, dependsOn)
+		new MRelations( srcProd, binaryDep, direct, newPublicInherited, memberRef, newInheritance, classes,
 				names, declaredClasses)
 	}
 
@@ -329,10 +368,15 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 				names, declaredClasses)
 	}
 
-	def addInternalClassNameDeps(src: File, dependsOn: Iterable[String], inherited: Iterable[String]): Relations = {
-		val newI = inheritance.addInternal(src, inherited)
+	def addInternalMemberRefDeps(src: File, dependsOn: Iterable[String]): Relations = {
 		val newD = memberRef.addInternal(src, dependsOn)
-		new MRelations( srcProd, binaryDep, direct, publicInherited, memberRef = newD, inheritance = newI, classes,
+		new MRelations( srcProd, binaryDep, direct, publicInherited, memberRef = newD, inheritance, classes,
+				names, declaredClasses)
+	}
+
+	def addInternalInheritanceDeps(className: String, dependsOn: Iterable[String]): Relations = {
+		val newI = inheritance.addInternal(className, dependsOn)
+		new MRelations( srcProd, binaryDep, direct, publicInherited, memberRef, inheritance = newI, classes,
 				names, declaredClasses)
 	}
 
@@ -353,11 +397,13 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 				publicInherited ++ o.publicInherited, memberRef = memberRef ++ o.memberRef,
 				inheritance = inheritance ++ o.inheritance, classes ++ o.classes, names ++ o.names,
 				declaredClasses ++ o.declaredClasses)
-	def -- (sources: Iterable[File]) =
+	def -- (sources: Iterable[File]) = {
+		val classNamesInSources = sources.flatMap(declaredClasses.forward)
 		new MRelations(srcProd -- sources, binaryDep -- sources, direct -- sources, publicInherited -- sources,
 				memberRef = memberRef -- sources,
-				inheritance = inheritance -- sources, classes -- sources, names -- sources,
+				inheritance = inheritance -- classNamesInSources, classes -- sources, names -- sources,
 				declaredClasses -- sources)
+	}
 
 	def groupBy[K](f: File => K): Map[K, Relations] =
 	{
@@ -386,8 +432,12 @@ private class MRelations(val srcProd: Relation[File, File], val binaryDep: Relat
 		}
 
 		def f1[B](item: (File, B)): K = f(item._1)
+		val fForInheritance: String => K = className => {
+			val srcFile = declaredClasses.reverse(className).head
+			f(srcFile)
+		}
 		outerJoin(srcProd.groupBy(f1), binaryDep.groupBy(f1), direct.groupBySource(f), publicInherited.groupBySource(f),
-				memberRef.groupBySource(f), inheritance.groupBySource(f),
+				memberRef.groupBySource(f), inheritance.groupBySource(fForInheritance),
 				classes.groupBy(f1), names.groupBy(f1), declaredClasses.groupBy(f1))
     }
 

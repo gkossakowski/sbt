@@ -21,6 +21,7 @@ object AnalysisFormats
 {
 	type RFF = Relation[File, File]
 	type RFS = Relation[File, String]
+	type RSS = Relation[String, String]
 
 
 		import System.{currentTimeMillis => now}
@@ -117,8 +118,8 @@ object AnalysisFormats
 	implicit def relationsSourceDependenciesByMemberRef(implicit internalFormat: Format[Relation[File, String]], externalFormat: Format[Relation[File,String]]): Format[SourceDependenciesByMemberRef] =
 		asProduct2[SourceDependenciesByMemberRef, RFS, RFS]( (a, b) => Relations.makeSourceDependenciesByMemberRef(a,b))( rs => (rs.internal, rs.external))(internalFormat, externalFormat)
 
-	implicit def relationsSourceDependenciesByInheritance(implicit internalFormat: Format[Relation[File, String]], externalFormat: Format[Relation[File,String]]): Format[SourceDependenciesByInheritance] =
-		asProduct2[SourceDependenciesByInheritance, RFS, RFS]( (a, b) => Relations.makeSourceDependenciesByInheritance(a,b))( rs => (rs.internal, rs.external))(internalFormat, externalFormat)
+	implicit def relationsSourceDependenciesByInheritance(implicit internalFormat: Format[RSS], externalFormat: Format[RSS]): Format[SourceDependenciesByInheritance] =
+		asProduct2[SourceDependenciesByInheritance, RSS, RSS]( (a, b) => Relations.makeSourceDependenciesByInheritance(a,b))( rs => (rs.internal, rs.external))(internalFormat, externalFormat)
 
 	implicit def relationFormat[A,B](implicit af: Format[Map[A, Set[B]]], bf: Format[Map[B, Set[A]]]): Format[Relation[A,B]] =
 		asProduct2[Relation[A,B], Map[A, Set[B]], Map[B, Set[A]]]( Relation.make _ )( r => (r.forwardMap, r.reverseMap) )(af, bf)

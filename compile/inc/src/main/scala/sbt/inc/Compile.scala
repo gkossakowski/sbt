@@ -85,10 +85,12 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 	// all internal class name dependencies, including direct and inherited
 	private[this] val memberRefDeps = new HashMap[File, Set[String]]
 	// inherited internal class name dependencies
-	private[this] val inheritanceDeps = new HashMap[File, Set[String]]
+	private[this] val inheritanceDeps = new HashMap[File, Set[(String,String)]]
 		// external source dependencies:
 		//   (internal source, external source depended on, API of external dependency, true if an inheritance dependency)
 	private[this] val extSrcDeps = new ListBuffer[(File, String, Source, Boolean)]
+	private[this] val extSrcMemberRefDeps = new ListBuffer[(File, String, Source)]
+	private[this] val extSrcInheritanceDeps = new ListBuffer[(File, String, String, Source)]
 	private[this] val binaryClassName = new HashMap[File, String]
 		 // source files containing a macro def.
 	private[this] val macroSources = Set[File]()
@@ -108,17 +110,23 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 		add(sourceDeps, source, dependsOn)
 		if(inherited) add(inheritedSourceDeps, source, dependsOn)
 	}
-	def classNameDependency(className: String, source: File, inherited: Boolean) = {
-		log.debug(s"classNameDependency(className = $className, source = $source, inherited = $inherited)")
+	def sourceMemberRefDependency(className: String, source: File) = {
+		log.debug(s"memberRefDependency(className = $className, source = $source)")
 		add(memberRefDeps, source, className)
-		if(inherited) add(inheritanceDeps, source, className)
 	}
+	def sourceInheritanceDependency(targetClassName: String, source: File, sourceClassName: String): Unit = {
+		log.debug(s"inheritanceDependency(className = $targetClassName, source = $source, sourceClassName = $sourceClassName)")
+		add(inheritanceDeps, source, (sourceClassName, targetClassName))
+	}
+
 	def externalBinaryDependency(binary: File, className: String, source: File, inherited: Boolean)
 	{
 		binaryClassName.put(binary, className)
 		add(binaryDeps, source, binary)
 	}
 	def externalSourceDependency(t4: (File, String, Source, Boolean)) =  extSrcDeps += t4
+	def externalSourceMemberRefDependency(t3: (File, String, Source)) =  extSrcMemberRefDeps += t3
+	def externalSourceInheritanceDependency(t4: (File, String, String, Source)) =  extSrcInheritanceDeps += t4
 
 	def binaryDependency(classFile: File, name: String, source: File, inherited: Boolean) =
 		internalMap(classFile) match
@@ -126,7 +134,6 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			case Some(dependsOn) =>
 				 // dependency is a product of a source not included in this compilation
 				log.debug(s"Recording dependency on $classFile as source dependency on $name")
-				classNameDependency(name, source, inherited)
 				sourceDependency(dependsOn, source, inherited)
 			case None =>
 				classToSource.get(classFile) match
@@ -135,10 +142,45 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 						// dependency is a product of a source in this compilation step,
 						//  but not in the same compiler run (as in javac v. scalac)
 						log.debug(s"Recording dependency on $classFile as source dependency on $name")
-						classNameDependency(name, source, inherited)
 						sourceDependency(dependsOn, source, inherited)
 					case None =>
 						externalDependency(classFile, name, source, inherited)
+				}
+		}
+	def binaryMemberRefDependency(classFile: File, name: String, source: File) = internalMap(classFile) match
+		{
+			case Some(dependsOn) =>
+				 // dependency is a product of a source not included in this compilation
+				log.debug(s"Recording dependency on $classFile as source dependency on $name")
+				sourceMemberRefDependency(name, source)
+			case None =>
+				classToSource.get(classFile) match
+				{
+					case Some(dependsOn) =>
+						// dependency is a product of a source in this compilation step,
+						//  but not in the same compiler run (as in javac v. scalac)
+						log.debug(s"Recording dependency on $classFile as source dependency on $name")
+						sourceMemberRefDependency(name, source)
+					case None =>
+						externalMemberRefDependency(classFile, name, source)
+				}
+		}
+	def binaryInheritanceDependency(classFile: File, targetClassName: String, source: File, sourceClassName: String) =
+		internalMap(classFile) match {
+			case Some(dependsOn) =>
+				 // dependency is a product of a source not included in this compilation
+				log.debug(s"Recording dependency on $classFile as source dependency on $targetClassName")
+				sourceInheritanceDependency(targetClassName, source, sourceClassName)
+			case None =>
+				classToSource.get(classFile) match
+				{
+					case Some(dependsOn) =>
+						// dependency is a product of a source in this compilation step,
+						//  but not in the same compiler run (as in javac v. scalac)
+						log.debug(s"Recording dependency on $classFile as source dependency on $targetClassName")
+						sourceInheritanceDependency(targetClassName, source, sourceClassName)
+					case None =>
+						externalInheritanceDependency(classFile, sourceClassName, targetClassName, source)
 				}
 		}
 
@@ -151,6 +193,27 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			case None =>
 				// dependency is some other binary on the classpath
 				externalBinaryDependency(classFile, name, source, inherited)
+		}
+
+	private[this] def externalMemberRefDependency(classFile: File, name: String, source: File): Unit =
+		externalAPI(classFile, name) match
+		{
+			case Some(api) =>
+				// dependency is a product of a source in another project
+				externalSourceMemberRefDependency( (source, name, api) )
+			case None =>
+				// dependency is some other binary on the classpath
+				externalBinaryDependency(classFile, name, source, false)
+		}
+	private[this] def externalInheritanceDependency(classFile: File, from: String, to: String, source: File): Unit =
+		externalAPI(classFile, to) match
+		{
+			case Some(api) =>
+				// dependency is a product of a source in another project
+				externalSourceInheritanceDependency( (source, from, to, api) )
+			case None =>
+				// dependency is some other binary on the classpath
+				externalBinaryDependency(classFile, to, source, true)
 		}
 
 	def generatedClass(source: File, module: File, name: String) =
@@ -195,11 +258,26 @@ private final class AnalysisCallback(internalMap: File => Option[File], external
 			val direct = sourceDeps.getOrElse(src, Nil: Iterable[File])
 			val publicInherited = inheritedSourceDeps.getOrElse(src, Nil: Iterable[File])
 			val memberRefDepsForSrc = memberRefDeps.getOrElse(src, Nil: Iterable[String])
-			val inheritanceDepsForSrc = inheritanceDeps.getOrElse(src, Nil: Iterable[String])
+			import scala.collection.immutable.{Set, Map}
+			// this is not very efficient
+			def toMultiMap[T,U](xs: Iterable[(T,U)]): Map[T, Set[U]] =
+				xs.groupBy(_._1).mapValues(_.map(_._2).toSet)
+			val inheritanceDepsForSrc = toMultiMap(inheritanceDeps.getOrElse(src, Nil: Iterable[(String, String)]))
 			a.addSource(src, s, stamp, direct, publicInherited, memberRefDepsForSrc, inheritanceDepsForSrc, info)
 		}
 	def getOrNil[A,B](m: collection.Map[A, Seq[B]], a: A): Seq[B] = m.get(a).toList.flatten
-	def addExternals(base: Analysis): Analysis = (base /: extSrcDeps) { case (a, (source, name, api, inherited)) => a.addExternalDep(source, name, api, inherited) }
+	def addExternals(base: Analysis): Analysis = {
+//		val base1 = (base /: extSrcDeps) { case (a, (source, name, api, inherited)) =>
+//			a.addExternalDep(source, name, api, inherited)
+//		}
+		val base1 = (base /: extSrcMemberRefDeps) { case (a, (source, name, api)) =>
+		  a.addExternalMemberRefDep(source, name, api)
+		}
+		val base2 = (base1 /: extSrcInheritanceDeps) { case (a, (source, from, to, api)) =>
+		  a.addExternalInheritanceDep(source, from, to, api)
+		}
+		base2
+	}
 	def addCompilation(base: Analysis): Analysis = base.copy(compilations = base.compilations.add(compilation))
 	def addUsedNames(base: Analysis): Analysis = (base /: usedNames) { case (a, (src, names)) =>
 	  (a /: names) { case (a, name) => a.copy(relations = a.relations.addUsedName(src, name)) }

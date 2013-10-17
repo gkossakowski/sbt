@@ -142,6 +142,10 @@ class ScalaCompilerForUnitTesting {
 			declaredClassesInSrcFile += className
 		}
 		def problem(what: String, pos: Position, msg: String, severity: Severity, reported: Boolean): Unit = ()
+		def sourceMemberRefDependency(className: String, source: File): Unit = ()
+	    def sourceInheritanceDependency(targetClassName: String, source: File, sourceClassName: String): Unit = ()
+	    def binaryMemberRefDependency(binary: File, name: String, source: File): Unit = ()
+	    def binaryInheritanceDependency(binary: File, targetClassName: String, source: File, sourceClassName: String): Unit = ()
 	}
 
 }

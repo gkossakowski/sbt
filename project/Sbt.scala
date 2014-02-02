@@ -263,8 +263,23 @@ object Sbt extends Build
 		exportedProducts in Compile := Nil,
 		libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ % "provided")
 	)
+	def compilerInterfacePackageTaskSettings(scalaVersion: String): Seq[Setting[_]] = {
+		val scalaVersionSuffix = if (scalaVersion == "default") "" else s"-$scalaVersion"
+		val artifactName = s"$srcID$scalaVersionSuffix"
+		val myArtifact = Artifact(artifactName).copy(configurations = Compile :: Nil).extra("e:component" -> artifactName)
+		val key = if (scalaVersion == "default") packageSrc else TaskKey[File](s"packageSrc-${scalaVersion.replace('.', '_')}")
+		val taskSettings = Defaults.packageTaskSettings(key, Defaults.packageSrcMappings) ++ Seq(
+			unmanagedSourceDirectories in key += sourceDirectory.value / s"scala-$scalaVersion",
+			unmanagedSources in key <<= Defaults.collectFiles(unmanagedSourceDirectories in key, includeFilter in unmanagedSources, excludeFilter in unmanagedSources),
+			artifact in key := myArtifact)
+		inConfig(Compile)(taskSettings) :+ (packagedArtifacts += ((artifact in key in Compile).value, (key in Compile).value))
+	}
+
+	val scalaVersionsForInterface = List("2.9", "2.10", "default")
+	val allCompilerPackageTasksSettings = scalaVersionsForInterface.flatMap(compilerInterfacePackageTaskSettings)
+
 	//
-	def compileInterfaceSettings: Seq[Setting[_]] = precompiledSettings ++ Seq[Setting[_]](
+	def compileInterfaceSettings: Seq[Setting[_]] = precompiledSettings ++ allCompilerPackageTasksSettings ++ Seq[Setting[_]](
 		exportJars := true,
 		// we need to fork because in unit tests we set usejavacp = true which means
 		// we are expecting all of our dependencies to be on classpath so Scala compiler
@@ -272,13 +287,16 @@ object Sbt extends Build
 		fork in Test := true,
 		// needed because we fork tests and tests are ran in parallel so we have multiple Scala
 		// compiler instances that are memory hungry
-		javaOptions in Test += "-Xmx1G",
-		artifact in (Compile, packageSrc) := Artifact(srcID).copy(configurations = Compile :: Nil).extra("e:component" -> srcID)
+		javaOptions in Test += "-Xmx1G"
 	)
 	def compilerSettings = Seq(
 		libraryDependencies <+= scalaVersion( "org.scala-lang" % "scala-compiler" % _ % "test" excludeAll(ExclusionRule(organization = "org.scala-lang.modules"))),
 		unmanagedJars in Test <<= (packageSrc in compileInterfaceSub in Compile).map(x => Seq(x).classpath)
 	)
+	def scalaMajorVersion(scalav: String): String = CrossVersion.partialVersion(scalav) match {
+		case Some((epoch, major)) => s"$epoch.$major"
+		case None => "default"
+	}
 	def precompiled(scalav: String): Project = baseProject(compilePath / "interface", "Precompiled " + scalav.replace('.', '_')) dependsOn(interfaceSub) settings(precompiledSettings : _*) settings(
 		scalaHome := None,
 		scalaVersion <<= (scalaVersion in ThisBuild) { sbtScalaV =>
@@ -287,7 +305,12 @@ object Sbt extends Build
 		},
 		// we disable compiling and running tests in precompiled subprojects of compiler interface
 		// so we do not need to worry about cross-versioning testing dependencies
-		sources in Test := Nil
+		sources in Test := Nil,
+		unmanagedSourceDirectories in Compile += {
+			val srcDir = (sourceDirectory in Compile).value
+			val scalaSpecificDir = srcDir / s"scala-${scalaMajorVersion(scalav)}"
+			if (scalaSpecificDir.exists) scalaSpecificDir else srcDir / "scala-default"
+		}
 	)
 	def ioSettings: Seq[Setting[_]] = Seq(
 		libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ % "test" excludeAll(ExclusionRule(organization = "org.scala-lang.modules")))

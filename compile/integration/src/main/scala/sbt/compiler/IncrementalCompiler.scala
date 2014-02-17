@@ -14,12 +14,14 @@ object IC extends IncrementalCompiler[Analysis, AnalyzingCompiler]
 		val setup = in.setup; import setup._
 		val options = in.options; import options.{options => scalacOptions, _}
 		val compilers = in.compilers; import compilers._
-		val agg = new AggressiveCompile(setup.cacheFile)
+		val cacheFile = setup.cacheFile
+		val analysisStore = AnalysisStoreCache.analysisStore(cacheFile)
+		val agg = new AggressiveCompile
 		val aMap = (f: File) => m2o(analysisMap(f))
 		val defClass = (f: File) => { val dc = definesClass(f); (name: String) => dc.apply(name) }
 		val incOptions = IncOptions.fromStringMap(incrementalCompilerOptions)
 		agg(scalac, javac, sources, classpath, output, cache, m2o(progress), scalacOptions, javacOptions, aMap,
-		    defClass, reporter, order, skip, incOptions)(log)
+		    analysisStore, defClass, reporter, order, skip, incOptions)(log)
 	}
 
 	private[this] def m2o[S](opt: Maybe[S]): Option[S] = if(opt.isEmpty) None else Some(opt.get)

@@ -1,2 +1,7 @@
 target/
 __pycache__
+.project
+.classpath
+.cache
+.settings
+.idea

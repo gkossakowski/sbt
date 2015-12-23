@@ -3,6 +3,7 @@
  */
 package xsbt
 
+import scala.collection.mutable.ArrayBuffer
 import scala.tools.nsc.{ io, symtab, Phase }
 import io.{ AbstractFile, PlainFile, ZipArchive }
 import symtab.Flags
@@ -44,24 +45,25 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile {
           val dependencyExtractor = new ExtractDependenciesTraverser
           dependencyExtractor.traverse(unit.body)
 
-          dependencyExtractor.topLevelDependencies foreach processDependency(context = DependencyByMemberRef)
-          dependencyExtractor.topLevelInheritanceDependencies foreach processDependency(context = DependencyByInheritance)
+          dependencyExtractor.memberRefDependencies foreach processDependency(context = DependencyByMemberRef)
+          dependencyExtractor.inheritanceDependencies foreach processDependency(context = DependencyByInheritance)
         } else {
-          unit.depends foreach processDependency(context = DependencyByMemberRef)
-          inheritedDependencies.getOrElse(sourceFile, Nil: Iterable[Symbol]) foreach processDependency(context = DependencyByInheritance)
+          throw new UnsupportedOperationException("Turning off name hashing is not supported in class-based dependency trackging.")
         }
         /**
          * Handles dependency on given symbol by trying to figure out if represents a term
          * that is coming from either source code (not necessarily compiled in this compilation
          * run) or from class file and calls respective callback method.
          */
-        def processDependency(context: DependencyContext)(on: Symbol) = {
-          def binaryDependency(file: File, className: String) = callback.binaryDependency(file, className, sourceFile, context)
-          val onSource = on.sourceFile
+        def processDependency(context: DependencyContext)(dep: ClassDependency) = {
+          val sourceClassName = dep.from.javaClassName
+          def binaryDependency(file: File, className: String) =
+            callback.binaryDependency(file, className, sourceClassName, sourceFile, context)
+          val onSource = dep.to.sourceFile
           if (onSource == null) {
-            classFile(on) match {
+            classFile(dep.to) match {
               case Some((f, className, inOutDir)) =>
-                if (inOutDir && on.isJavaDefined) registerTopLevelSym(on)
+                if (inOutDir && dep.to.isJavaDefined) registerTopLevelSym(dep.to)
                 f match {
                   case ze: ZipArchive#Entry => for (zip <- ze.underlyingSource; zipFile <- Option(zip.file)) binaryDependency(zipFile, className)
                   case pf: PlainFile        => binaryDependency(pf.file, className)
@@ -70,22 +72,31 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile {
               case None => ()
             }
           } else if (onSource.file != sourceFile)
-            callback.sourceDependency(onSource.file, sourceFile, context)
+            callback.classDependency(dep.to.javaClassName, sourceClassName, context)
         }
       }
     }
   }
 
-  private class ExtractDependenciesTraverser extends Traverser {
-    private val _dependencies = collection.mutable.HashSet.empty[Symbol]
-    protected def addDependency(dep: Symbol): Unit = if (dep ne NoSymbol) _dependencies += dep
-    def dependencies: Iterator[Symbol] = _dependencies.iterator
-    def topLevelDependencies: Iterator[Symbol] = _dependencies.map(enclosingTopLevelClass).iterator
+  private case class ClassDependency(from: Symbol, to: Symbol)
 
-    private val _inheritanceDependencies = collection.mutable.HashSet.empty[Symbol]
-    protected def addInheritanceDependency(dep: Symbol): Unit = if (dep ne NoSymbol) _inheritanceDependencies += dep
-    def inheritanceDependencies: Iterator[Symbol] = _inheritanceDependencies.iterator
-    def topLevelInheritanceDependencies: Iterator[Symbol] = _inheritanceDependencies.map(enclosingTopLevelClass).iterator
+  private class ExtractDependenciesTraverser extends Traverser {
+    private val _memberRefDependencies = collection.mutable.HashSet.empty[ClassDependency]
+    private val _inheritanceDependencies = collection.mutable.HashSet.empty[ClassDependency]
+    private def addClassDependency(deps: collection.mutable.HashSet[ClassDependency], dep: Symbol): Unit = {
+      val fromClass = currentOwner.enclClass
+      if (fromClass != NoSymbol && !fromClass.isPackage) {
+        deps += ClassDependency(fromClass, dep.enclClass)
+      } else {
+        debugwarn(s"No enclosing class. Discarding dependency on $dep (currentOwner = $currentOwner).")
+      }
+    }
+    private def addDependency(dep: Symbol): Unit =
+      addClassDependency(_memberRefDependencies, dep)
+    private def addInheritanceDependency(dep: Symbol): Unit =
+      addClassDependency(_inheritanceDependencies, dep)
+    def memberRefDependencies: Iterator[ClassDependency] = _memberRefDependencies.iterator
+    def inheritanceDependencies: Iterator[ClassDependency] = _inheritanceDependencies.iterator
 
     /*
      * Some macros appear to contain themselves as original tree.
@@ -109,7 +120,6 @@ final class Dependency(val global: CallbackGlobal) extends LocateClassFile {
             addDependency(lookupImported(name.toTermName))
             addDependency(lookupImported(name.toTypeName))
         }
-
       /*
        * Idents are used in number of situations:
        *  - to refer to local variable

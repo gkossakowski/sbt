@@ -26,8 +26,9 @@ object DotGraph {
   def apply(relations: Relations, outputDir: File, sourceToString: File => String, externalToString: File => String): Unit = {
     def file(name: String) = new File(outputDir, name)
     IO.createDirectory(outputDir)
-    generateGraph(file("int-source-deps"), "dependencies", relations.internalSrcDep, sourceToString, sourceToString)
-    generateGraph(file("binary-dependencies"), "externalDependencies", relations.binaryDep, externalToString, sourceToString)
+    throw new UnsupportedOperationException("Methods that generate graphs got broken due to switch to class-based dependency tracking")
+    //    generateGraph(file("int-source-deps"), "dependencies", relations.internalSrcDep, sourceToString, sourceToString)
+    //    generateGraph(file("binary-dependencies"), "externalDependencies", relations.binaryDep, externalToString, sourceToString)
   }
 
   def generateGraph[Key, Value](file: File, graphName: String, relation: Relation[Key, Value],

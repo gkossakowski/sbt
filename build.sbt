@@ -191,7 +191,7 @@ lazy val relationProj = (project in utilPath / "relation").
 
 // class file reader and analyzer
 lazy val classfileProj = (project in utilPath / "classfile").
-  dependsOn(ioProj, interfaceProj, logProj).
+  dependsOn(ioProj, interfaceProj % "test->test", logProj).
   settings(
     testedBaseSettings,
     name := "Classfile"

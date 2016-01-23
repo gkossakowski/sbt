@@ -28,7 +28,7 @@ import xsbti.api.{ ClassLike, DefinitionType, PathComponent, SimpleType }
 class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
     // Tracks the source file associated with the CompilationUnit currently being processed by the API phase.
     // This is used when recording inheritance dependencies.
-    sourceFile: File) extends Compat {
+    sourceFile: File) extends Compat with ClassName {
 
   import global._
 
@@ -601,7 +601,7 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
 
     new xsbti.api.ClassLike(
       defType, lzy(selfType(in, sym)), lzy(structureWithInherited(viewer(in).memberInfo(sym), sym)), emptyStringArray, typeParameters(in, sym), // look at class symbol
-      c.fullName, getAccess(c), getModifiers(c), annotations(in, c)) // use original symbol (which is a term symbol when `c.isModule`) for `name` and other non-classy stuff
+      className(c), getAccess(c), getModifiers(c), annotations(in, c)) // use original symbol (which is a term symbol when `c.isModule`) for `name` and other non-classy stuff
   }
 
   // TODO: could we restrict ourselves to classes, ignoring the term symbol for modules,

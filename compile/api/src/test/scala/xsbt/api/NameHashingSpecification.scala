@@ -274,9 +274,9 @@ class NameHashingSpecification extends Specification {
   }
 
   /**
-    * Checks that private members do NOT contribute to name hashes.
-    * Test for https://github.com/sbt/sbt/issues/2324
-    */
+   * Checks that private members do NOT contribute to name hashes.
+   * Test for https://github.com/sbt/sbt/issues/2324
+   */
   "private members in classes do not contribute to name hashes" in {
     /* class Foo { private val x } */
     val classFoo =

@@ -192,6 +192,7 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
     extend(ClassHash)
     hashParameterizedDefinition(c)
     hashType(c.selfType)
+    hashTypes(c.childrenOfSealedClass, includeDefinitions)
     hashStructure(c.structure, includeDefinitions, isTrait(c))
   }
   def hashField(f: FieldLike): Unit = {

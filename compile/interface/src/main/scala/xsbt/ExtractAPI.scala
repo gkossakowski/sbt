@@ -214,10 +214,10 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
       val hasValueClassAsReturnType: Boolean = {
         val tpe = viewer(in).memberInfo(s)
         tpe match {
-          case PolyType(_, base) => isAnyValSubtype(base.typeSymbol)
+          case PolyType(_, base)         => isAnyValSubtype(base.typeSymbol)
           case MethodType(_, resultType) => isAnyValSubtype(resultType.typeSymbol)
-          case Nullary(resultType) => isAnyValSubtype(resultType.typeSymbol)
-          case resultType => isAnyValSubtype(resultType.typeSymbol)
+          case Nullary(resultType)       => isAnyValSubtype(resultType.typeSymbol)
+          case resultType                => isAnyValSubtype(resultType.typeSymbol)
         }
       }
 
@@ -247,7 +247,7 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
               // of def foo.
               val beforeErasure =
                 build(resultType, typeParams, parameterList(params) :: valueParameters)
-              val afterErasure  =
+              val afterErasure =
                 if (inspectPostErasure)
                   build(resultType, typeParams, parameterList(mType.params, erase = true) :: valueParameters)
                 else
@@ -574,7 +574,6 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
       case None =>
         s.fullName
     }
-
 
   /* Representation for the self type of a class symbol `s`, or `emptyType` for an *unascribed* self variable (or no self variable at all).
      Only the self variable's explicitly ascribed type is relevant for incremental compilation. */

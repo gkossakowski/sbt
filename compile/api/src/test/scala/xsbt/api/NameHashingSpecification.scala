@@ -18,10 +18,8 @@ class NameHashingSpecification extends Specification {
     val def2 = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
     val classBar1 = simpleClass("Bar", def1)
     val classBar2 = simpleClass("Bar", def1, def2)
-    val api1 = new SourceAPI(Array.empty, Array(classBar1))
-    val api2 = new SourceAPI(Array.empty, Array(classBar2))
-    val nameHashes1 = nameHashing.nameHashes(api1)
-    val nameHashes2 = nameHashing.nameHashes(api2)
+    val nameHashes1 = nameHashing.nameHashes(classBar1)
+    val nameHashes2 = nameHashing.nameHashes(classBar2)
     assertNameHashEqualForRegularName("Bar", nameHashes1, nameHashes2)
     assertNameHashEqualForRegularName("foo", nameHashes1, nameHashes2)
     nameHashes1.regularMembers.map(_.name).toSeq must not contain ("bar")
@@ -40,10 +38,8 @@ class NameHashingSpecification extends Specification {
     val nestedBar2 = simpleClass("Bar2", def2)
     val classA = simpleClass("Foo", nestedBar1, nestedBar2)
     val classB = simpleClass("Foo", nestedBar2, nestedBar1)
-    val api1 = new SourceAPI(Array.empty, Array(classA))
-    val api2 = new SourceAPI(Array.empty, Array(classB))
-    val nameHashes1 = nameHashing.nameHashes(api1)
-    val nameHashes2 = nameHashing.nameHashes(api2)
+    val nameHashes1 = nameHashing.nameHashes(classA)
+    val nameHashes2 = nameHashing.nameHashes(classB)
     val def1Hash = HashAPI(def1)
     val def2Hash = HashAPI(def2)
     def1Hash !=== def2Hash
@@ -79,10 +75,8 @@ class NameHashingSpecification extends Specification {
       val nestedBar2 = simpleClass("Bar2", deff)
       simpleClass("Foo", nestedBar1, nestedBar2)
     }
-    val api1 = new SourceAPI(Array.empty, Array(classA))
-    val api2 = new SourceAPI(Array.empty, Array(classB))
-    val nameHashes1 = nameHashing.nameHashes(api1)
-    val nameHashes2 = nameHashing.nameHashes(api2)
+    val nameHashes1 = nameHashing.nameHashes(classA)
+    val nameHashes2 = nameHashing.nameHashes(classB)
     nameHashes1 !=== nameHashes2
   }
 
@@ -109,11 +103,11 @@ class NameHashingSpecification extends Specification {
     val parentB = simpleClass("Parent", barMethod)
     val childA = {
       val structure = new Structure(lzy(Array[Type](parentA.structure)), lzy(Array.empty[Definition]), lzy(Array.empty[Definition]))
-      simpleClass("Child", structure)
+      simpleClassLike("Child", structure)
     }
     val childB = {
       val structure = new Structure(lzy(Array[Type](parentB.structure)), lzy(Array.empty[Definition]), lzy(Array[Definition](barMethod)))
-      simpleClass("Child", structure)
+      simpleClassLike("Child", structure)
     }
     val parentANameHashes = nameHashesForClass(parentA)
     val parentBNameHashes = nameHashesForClass(parentB)
@@ -164,31 +158,55 @@ class NameHashingSpecification extends Specification {
     assertNameHashNotEqualForRegularName("bar", nameHashes1, nameHashes2)
   }
 
-  private def assertNameHashEqualForRegularName(name: String, nameHashes1: _internalOnly_NameHashes,
-    nameHashes2: _internalOnly_NameHashes) = {
+  /**
+   * Checks properties of merge operation on name hashes:
+   *
+   *   - names in the result is union of names of arguments
+   *   - non-conflicting names have their hashes preserved
+   *   - conflicting names have their hashes combined
+   */
+  "merge name hashes" in {
+    val nameHashing = new NameHashing
+    val def1 = new Def(Array.empty, strTpe, Array.empty, "foo", publicAccess, defaultModifiers, Array.empty)
+    val def2 = new Def(Array.empty, intTpe, Array.empty, "bar", publicAccess, defaultModifiers, Array.empty)
+    val classBar = simpleClass("Bar", def1)
+    val objectBar = simpleObject("Bar", def2)
+    val nameHashes1 = nameHashing.nameHashes(classBar)
+    val nameHashes2 = nameHashing.nameHashes(objectBar)
+    val merged = NameHashing.merge(nameHashes1, nameHashes2)
+    nameHashes1.regularMembers.map(_.name).toSet === Set("Bar", "foo")
+    nameHashes2.regularMembers.map(_.name).toSet === Set("Bar", "bar")
+    merged.regularMembers.map(_.name).toSet === Set("Bar", "foo", "bar")
+    assertNameHashEqualForRegularName("foo", nameHashes1, merged)
+    assertNameHashEqualForRegularName("bar", nameHashes2, merged)
+    assertNameHashNotEqualForRegularName("Bar", nameHashes1, merged)
+    assertNameHashNotEqualForRegularName("Bar", nameHashes2, merged)
+  }
+
+  private def assertNameHashEqualForRegularName(name: String, nameHashes1: NameHashes,
+    nameHashes2: NameHashes) = {
     val nameHash1 = nameHashForRegularName(nameHashes1, name)
     val nameHash2 = nameHashForRegularName(nameHashes1, name)
     nameHash1 === nameHash2
   }
 
-  private def assertNameHashNotEqualForRegularName(name: String, nameHashes1: _internalOnly_NameHashes,
-    nameHashes2: _internalOnly_NameHashes) = {
+  private def assertNameHashNotEqualForRegularName(name: String, nameHashes1: NameHashes,
+    nameHashes2: NameHashes) = {
     val nameHash1 = nameHashForRegularName(nameHashes1, name)
     val nameHash2 = nameHashForRegularName(nameHashes2, name)
     nameHash1 !=== nameHash2
   }
 
-  private def nameHashForRegularName(nameHashes: _internalOnly_NameHashes, name: String): _internalOnly_NameHash =
+  private def nameHashForRegularName(nameHashes: NameHashes, name: String): NameHash =
     try {
       nameHashes.regularMembers.find(_.name == name).get
     } catch {
       case e: NoSuchElementException => throw new RuntimeException(s"Couldn't find $name in $nameHashes", e)
     }
 
-  private def nameHashesForClass(cl: ClassLike): _internalOnly_NameHashes = {
-    val sourceAPI = new SourceAPI(Array.empty, Array(cl))
+  private def nameHashesForClass(cl: ClassLike): NameHashes = {
     val nameHashing = new NameHashing
-    nameHashing.nameHashes(sourceAPI)
+    nameHashing.nameHashes(cl)
   }
 
   private def lzy[T](x: T): Lazy[T] = new Lazy[T] { def get: T = x }
@@ -197,11 +215,18 @@ class NameHashingSpecification extends Specification {
 
   private def simpleClass(name: String, defs: Definition*): ClassLike = {
     val structure = simpleStructure(defs: _*)
-    simpleClass(name, structure)
+    simpleClassLike(name, structure)
   }
 
-  private def simpleClass(name: String, structure: Structure): ClassLike = {
-    new ClassLike(DefinitionType.ClassDef, lzy(emptyType), lzy(structure), Array.empty, Array.empty, Array.empty, name, publicAccess, defaultModifiers, Array.empty)
+  private def simpleObject(name: String, defs: Definition*): ClassLike = {
+    val structure = simpleStructure(defs: _*)
+    simpleClassLike(name, structure, dt = DefinitionType.Module)
+  }
+
+  private def simpleClassLike(name: String, structure: Structure,
+    dt: DefinitionType = DefinitionType.ClassDef): ClassLike = {
+    new ClassLike(dt, lzy(emptyType), lzy(structure), Array.empty, Array.empty, false, Array.empty, name, publicAccess,
+      defaultModifiers, Array.empty)
   }
 
   private val emptyType = new EmptyType

@@ -9,4 +9,4 @@ $ copy-file changes/Client.scala macro-client/src/main/scala/Client.scala
 
 # Object Foo depends on Client via composition, thus a whitespace change to
 # Client shouldn't trigger its recompilation
-> check-not-recompiled Foo.scala
+> check-not-recompiled macro.Foo

@@ -8,7 +8,7 @@ import xsbt.api.{ Discovered, Discovery }
 import inc.Analysis
 import TaskExtra._
 import Types._
-import xsbti.api.Definition
+import xsbti.api.{ ClassLike, Definition }
 import ConcurrentRestrictions.Tag
 
 import testing.{ AnnotatedFingerprint, Fingerprint, Framework, SubclassFingerprint, Runner, TaskDef, SuiteSelector, Task => TestTask }
@@ -269,7 +269,11 @@ object Tests {
   def discover(frameworks: Seq[Framework], analysis: Analysis, log: Logger): (Seq[TestDefinition], Set[String]) =
     discover(frameworks flatMap TestFramework.getFingerprints, allDefs(analysis), log)
 
-  def allDefs(analysis: Analysis) = analysis.apis.internal.values.flatMap(_.api.definitions).toSeq
+  def allDefs(analysis: Analysis): Seq[ClassLike] = {
+    def companionsApis(c: xsbti.api.Companions): Seq[xsbti.api.ClassLike] =
+      Seq(c.classApi, c.objectApi)
+    analysis.apis.internal.values.flatMap(x => companionsApis(x.api)).toSeq
+  }
   def discover(fingerprints: Seq[Fingerprint], definitions: Seq[Definition], log: Logger): (Seq[TestDefinition], Set[String]) =
     {
       val subclasses = fingerprints collect { case sub: SubclassFingerprint => (sub.superclassName, sub.isModule, sub) };

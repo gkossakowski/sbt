@@ -7,7 +7,8 @@ import xsbti.api.AnalyzedClass
 private final class IncrementalAntStyle(log: Logger, options: IncOptions) extends IncrementalCommon(log, options) {
 
   /** Ant-style mode doesn't do anything special with package objects */
-  override protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations): Set[String] = Set.empty
+  override protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations,
+    apis: APIs): Set[String] = Set.empty
 
   /** In Ant-style mode we don't need to compare APIs because we don't perform any invalidation */
   override protected def sameAPI[T](src: T, a: AnalyzedClass, b: AnalyzedClass): Option[APIChange[T]] = None

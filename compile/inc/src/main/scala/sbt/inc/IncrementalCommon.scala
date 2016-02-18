@@ -28,7 +28,8 @@ private[inc] abstract class IncrementalCommon(log: Logger, options: IncOptions) 
       previous
     else {
 
-      val withPackageObjects = invalidatedRaw ++ invalidatedPackageObjects(invalidatedRaw, previous.relations)
+      val withPackageObjects = invalidatedRaw ++ invalidatedPackageObjects(invalidatedRaw, previous.relations,
+        previous.apis)
       val invalidatedClasses = withPackageObjects
 
       val current = recompileClasses(invalidatedClasses, modifiedSrcs, allSources, binaryChanges, previous, doCompile,
@@ -78,7 +79,8 @@ private[inc] abstract class IncrementalCommon(log: Logger, options: IncOptions) 
     } else invalidated
   }
 
-  protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations): Set[String]
+  protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations,
+    apis: APIs): Set[String]
 
   /**
    * Logs API changes using debug-level logging. The API are obtained using the APIDiff class.

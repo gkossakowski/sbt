@@ -132,6 +132,8 @@ private final class AnalysisCallback(internalBinaryToSourceClassName: String => 
   private[this] val binaryClassName = new HashMap[File, String]
   // source files containing a macro def.
   private[this] val macroClasses = Set[String]()
+  // source files defining a package object
+  private[this] val packageObjectSources = Set[File]()
 
   private def add[A, B](map: Map[A, Set[B]], a: A, b: B): Unit =
     map.getOrElseUpdate(a, new HashSet[B]) += b

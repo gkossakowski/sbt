@@ -2,7 +2,7 @@ package sbt
 package inc
 
 import xsbti.api.AnalyzedClass
-import xsbt.api.SameAPI
+import xsbt.api.{ APIUtil, SameAPI }
 import java.io.File
 
 /**
@@ -17,13 +17,10 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
 
   // Package objects are fragile: if they inherit from an invalidated source, get "class file needed by package is missing" error
   //  This might be too conservative: we probably only need package objects for packages of invalidated sources.
-  override protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations): Set[String] = {
-    invalidatedClasses flatMap { cls =>
-      val dependentClasses = relations.inheritance.internal.reverse(cls)
-      dependentClasses
-    } filter { (cls: String) =>
-      val srcFile: File = relations.classes.reverse(cls).head
-      srcFile.getName == "package.scala"
+  protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations,
+    apis: APIs): Set[String] = {
+    transitiveDeps(invalidatedClasses)(relations.inheritance.internal.reverse) filter {
+      className => APIUtil.hasPackageObject(apis.internalAPI(className))
     }
   }
 

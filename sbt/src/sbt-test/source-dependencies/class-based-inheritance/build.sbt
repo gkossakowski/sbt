@@ -25,6 +25,8 @@ TaskKey[Unit]("check-compilations") := {
   // B.scala should be compiled only at the beginning
   recompiledClassesInIteration(0, Set("B"))
   // A.scala is changed and recompiled
-  recompiledClassesInIteration(1, Set("A", "A2"))
-  assert(allCompilations.size == 2)
+  recompiledClassesInIteration(1, Set.empty)
+  recompiledClassesInIteration(2, Set("C"))
+  recompiledClassesInIteration(3, Set("A", "A2"))
+  assert(allCompilations.size == 4, s"The total number of compilation iterations is ${allCompilations.size}")
 }

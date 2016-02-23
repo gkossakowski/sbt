@@ -9,7 +9,10 @@
 # introduces first compile iteration
 > compile
 $ copy-file changes/A1.scala src/main/scala/A.scala
-# second iteration
-#> compile
-# check if there are only two compile iterations performed
+# second iteration and third iteration (due to invalidation of C)
+> compile
+$ copy-file changes/A2.scala src/main/scala/A.scala
+# fourth iteration
+> compile
+# check if there were exactly four compile iterations performed
 > check-compilations

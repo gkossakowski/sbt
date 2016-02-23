@@ -2,15 +2,32 @@ package xsbt
 
 import java.io.File
 import java.util.{ Arrays, Comparator }
-import scala.tools.nsc.{ io, plugins, symtab, Global, Phase }
-import io.{ AbstractFile, PlainFile, ZipArchive }
-import plugins.{ Plugin, PluginComponent }
-import symtab.Flags
-import scala.collection.mutable.{ HashMap, HashSet, ListBuffer }
-import xsbti.api.{ ClassLike, DefinitionType, PathComponent, SimpleType }
+import scala.tools.nsc.symtab.Flags
+import scala.collection.mutable.{ HashMap, HashSet}
+import xsbti.api._
 
 /**
  * Extracts full (including private members) API representation out of Symbols and Types.
+ *
+ * API for each class is extracted separately. Inner classes are represented as an empty (without members)
+ * member of the outer class and as a separate class with full API representation. For example:
+ *
+ * class A {
+ *   class B {
+ *     def foo: Int = 123
+ *   }
+ * }
+ *
+ * Is represented as:
+ *
+ * // className = A
+ * class A {
+ *   class B
+ * }
+ * // className = A.B
+ * class A.B {
+ *   def foo: Int
+ * }
  *
  * Each compilation unit should be processed by a fresh instance of this class.
  *
@@ -44,6 +61,8 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
   private[this] val pending = new HashSet[xsbti.api.Lazy[_]]
 
   private[this] val emptyStringArray = new Array[String](0)
+
+  private[this] val allNonLocalClassesInSrc = new HashSet[xsbti.api.ClassLike]
 
   /**
    * Implements a work-around for https://github.com/sbt/sbt/issues/823
@@ -369,6 +388,21 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
   }
 
   /**
+    * Create structure without any members. This is used to declare an inner class as a member of other class
+    * but to not include its full api. Class signature is enough.
+    */
+  private def mkStructureWithEmptyMembers(info: Type, s: Symbol): xsbti.api.Structure = {
+    // We're not interested in the full linearization, so we can just use `parents`,
+    // which side steps issues with baseType when f-bounded existential types and refined types mix
+    // (and we get cyclic types which cause a stack overflow in showAPI).
+    //
+    // The old algorithm's semantics for inherited dependencies include all types occurring as a parent anywhere in a type,
+    // so that, in `class C { def foo: A  }; class A extends B`, C is considered to have an "inherited dependency" on `A` and `B`!!!
+    val parentTypes = if (global.callback.nameHashing()) info.parents else linearizedAncestorTypes(info)
+    mkStructure(s, parentTypes, Nil, Nil)
+  }
+
+  /**
    * Track all ancestors and inherited members for a class's API.
    *
    * A class's hash does not include hashes for its parent classes -- only the symbolic names --
@@ -583,7 +617,16 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
     // as it does not contribute any information relevant outside of the class definition.
     if ((s.thisSym eq s) || s.typeOfThis == s.info) Constants.emptyType else processType(in, s.typeOfThis)
 
-  def classLike(in: Symbol, c: Symbol): ClassLike = classLikeCache.getOrElseUpdate((in, c), mkClassLike(in, c))
+  def extractAllClassesOf(in: Symbol, c: Symbol): Unit = {
+    classLike(in, c)
+  }
+
+  def allExtractedNonLocalClasses: Set[ClassLike] = {
+    forceStructures()
+    allNonLocalClassesInSrc.toSet
+  }
+
+  private def classLike(in: Symbol, c: Symbol): ClassLike = classLikeCache.getOrElseUpdate((in, c), mkClassLike(in, c))
   private def mkClassLike(in: Symbol, c: Symbol): ClassLike = {
     // Normalize to a class symbol, and initialize it.
     // (An object -- aka module -- also has a term symbol,
@@ -597,11 +640,23 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
       } else DefinitionType.ClassDef
     val childrenOfSealedClass = sort(sym.children.toArray).map(c => processType(c, c.tpe))
     val topLevel = sym.owner.isPackageClass
+    def constructClass(structure: xsbti.api.Lazy[Structure]): ClassLike = {
+      new xsbti.api.ClassLike(
+        defType, lzy(selfType(in, sym)), structure, emptyStringArray,
+        childrenOfSealedClass, topLevel, typeParameters(in, sym), // look at class symbol
+        className(c), getAccess(c), getModifiers(c), annotations(in, c)) // use original symbol (which is a term symbol when `c.isModule`) for `name` and other non-classy stuff
+    }
 
-    new xsbti.api.ClassLike(
-      defType, lzy(selfType(in, sym)), lzy(structureWithInherited(viewer(in).memberInfo(sym), sym)), emptyStringArray,
-      childrenOfSealedClass, topLevel, typeParameters(in, sym), // look at class symbol
-      className(c), getAccess(c), getModifiers(c), annotations(in, c)) // use original symbol (which is a term symbol when `c.isModule`) for `name` and other non-classy stuff
+    val info = viewer(in).memberInfo(sym)
+    val structure = lzy(structureWithInherited(info, sym))
+    val classWithMembers = constructClass(structure)
+    val structureWithoutMembers = lzy(mkStructureWithEmptyMembers(info, sym))
+    val classWithoutMembers = constructClass(structureWithoutMembers)
+
+    if (isPublicStructure(sym))
+      allNonLocalClassesInSrc += classWithMembers
+
+    classWithoutMembers
   }
 
   // TODO: could we restrict ourselves to classes, ignoring the term symbol for modules,

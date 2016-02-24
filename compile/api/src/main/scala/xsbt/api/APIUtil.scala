@@ -12,7 +12,7 @@ object APIUtil {
   }
   val byteToModifiers = (b: Byte) => {
     def x(bit: Int) = (b & (1 << bit)) != 0
-    new Modifiers(x(0), x(1), x(2), x(3), x(4), x(5), x(6))
+    new Modifiers(x(0), x(1), x(2), x(3), x(4), x(5), x(6), x(7))
   }
 
   def isScalaSourceName(name: String): Boolean = name.endsWith(".scala")
@@ -75,7 +75,7 @@ object APIUtil {
       case _ => true
     }
 
-  private val emptyModifiers = new Modifiers(false, false, false, false, false, false, false)
+  private val emptyModifiers = new Modifiers(false, false, false, false, false, false, false, false)
   private val emptyStructure = new Structure(lzy(Array.empty), lzy(Array.empty), lzy(Array.empty))
   def emptyClassLike(name: String, definitionType: DefinitionType): ClassLike =
     new xsbti.api.ClassLike(definitionType, lzy(emptyType), lzy(emptyStructure), Array.empty, Array.empty, true,

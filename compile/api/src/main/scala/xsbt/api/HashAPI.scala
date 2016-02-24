@@ -66,6 +66,8 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
     }
   }
 
+  private[this] def isTrait(cl: ClassLike) = cl.definitionType == DefinitionType.Trait
+
   private[this] final val ValHash = 1
   private[this] final val VarHash = 2
   private[this] final val DefHash = 3
@@ -142,16 +144,37 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
   def hashAPI(c: ClassLike): Hash =
     {
       hash = startHash(0)
-      hashDefinitions(Seq(c), c.topLevel)
+      hashDefinitions(Seq(c), topLevel = true,  isTrait = false)
       finalizeHash
     }
 
   def hashPackage(p: Package) = hashString(p.name)
 
+  @deprecated("Use the overload that indicates if the enclosing definition is a trait.", "0.14")
   def hashDefinitions(ds: Seq[Definition], topLevel: Boolean): Unit =
+    hashDefinitions(ds, topLevel, isTrait = false)
+
+  def hashDefinitions(ds: Seq[Definition], topLevel: Boolean, isTrait: Boolean): Unit =
     {
+      def isPublic(d: Definition): Boolean = d.access match { case _: xsbti.api.Public => true; case _ => false }
+      def isTraitBreaker(d: Definition): Boolean = d match {
+        // Vars and vals in traits introduce getters, setters and fields in the implementing classes.
+        // See test `source-dependencies/trait-private-var
+        case _: FieldLike  => true
+        // Objects in traits introduce fields in the implementing classes.
+        // See test `source-dependencies/trait-private-object`
+        case cl: ClassLike => cl.definitionType == DefinitionType.Module
+        // super calls introduce accessors that are not part of the public API
+        case d: Def        => d.modifiers.isSuperAccessor
+        case _             => false
+      }
+      val includedPrivateDefinitions =
+        if (!includePrivate && !topLevel && isTrait) {
+          ds filter (x => isTraitBreaker(x) && !isPublic(x))
+        } else Seq.empty
+
       val defs = SameAPI.filterDefinitions(ds, topLevel, includePrivate)
-      hashSymmetric(defs, hashDefinition)
+      hashSymmetric(includedPrivateDefinitions ++ defs, hashDefinition)
     }
 
   /**
@@ -190,7 +213,7 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
     hashParameterizedDefinition(c)
     hashType(c.selfType)
     hashTypes(c.childrenOfSealedClass, includeDefinitions)
-    hashStructure(c.structure, includeDefinitions)
+    hashStructure(c.structure, includeDefinitions, isTrait(c))
   }
   def hashField(f: FieldLike): Unit = {
     f match {
@@ -349,14 +372,14 @@ final class HashAPI(includePrivate: Boolean, includeParamNames: Boolean, include
     hashType(a.baseType)
     hashAnnotations(a.annotations)
   }
-  final def hashStructure(structure: Structure, includeDefinitions: Boolean) =
-    visit(visitedStructures, structure)(structure => hashStructure0(structure, includeDefinitions))
-  def hashStructure0(structure: Structure, includeDefinitions: Boolean): Unit = {
+  final def hashStructure(structure: Structure, includeDefinitions: Boolean, isTrait: Boolean = false) =
+    visit(visitedStructures, structure)(structure => hashStructure0(structure, includeDefinitions, isTrait))
+  def hashStructure0(structure: Structure, includeDefinitions: Boolean, isTrait: Boolean = false): Unit = {
     extend(StructureHash)
     hashTypes(structure.parents, includeDefinitions)
     if (includeDefinitions) {
-      hashDefinitions(structure.declared, false)
-      hashDefinitions(structure.inherited, false)
+      hashDefinitions(structure.declared, topLevel = false, isTrait)
+      hashDefinitions(structure.inherited, topLevel = false, isTrait)
     }
   }
   def hashParameters(parameters: Seq[TypeParameter], base: Type): Unit =

@@ -39,7 +39,7 @@ object APIs {
     new MAPIs(internal, external)
   def empty: APIs = apply(Map.empty, Map.empty)
 
-  val emptyModifiers = new Modifiers(false, false, false, false, false, false, false)
+  val emptyModifiers = new Modifiers(false, false, false, false, false, false, false, false)
   val emptyName = ""
   val emptyAPI = APIUtil.emptyClassLike(emptyName, DefinitionType.ClassDef)
   val emptyAPIHash = -1

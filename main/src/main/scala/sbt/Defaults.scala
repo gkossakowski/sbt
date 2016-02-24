@@ -1038,8 +1038,7 @@ object Classpaths {
     internalDependencyClasspath <<= internalDependencies,
     unmanagedClasspath <<= unmanagedDependencies,
     managedClasspath := managedJars(classpathConfiguration.value, classpathTypes.value, update.value),
-    exportedProducts <<= exportProductsTask,
-    exportedProductsAlways <<= trackedExportedProducts(TrackLevel.TrackAlways),
+    exportedProducts <<= trackedExportedProducts(TrackLevel.TrackAlways),
     exportedProductsIfMissing <<= trackedExportedProducts(TrackLevel.TrackIfMissing),
     exportedProductsNoTracking <<= trackedExportedProducts(TrackLevel.NoTracking),
     unmanagedJars := findUnmanagedJars(configuration.value, unmanagedBase.value, includeFilter in unmanagedJars value, excludeFilter in unmanagedJars value)
@@ -1150,10 +1149,14 @@ object Classpaths {
     overrideBuildResolvers <<= appConfiguration(isOverrideRepositories),
     externalResolvers <<= (externalResolvers.task.?, resolvers, appResolvers, useJCenter) {
       case (Some(delegated), Seq(), _, _) => delegated
-      case (_, rs, Some(ars), uj)         => task { ars ++ Resolver.reorganizeAppResolvers(rs, uj, true) }
-      case (_, rs, _, uj)                 => task { Resolver.withDefaultResolvers(rs, uj) }
+      case (_, rs, Some(ars), uj)         => task { ars ++ rs }
+      case (_, rs, _, uj)                 => task { Resolver.withDefaultResolvers(rs, uj, true) }
     },
-    appResolvers <<= appConfiguration apply appRepositories,
+    appResolvers := {
+      val ac = appConfiguration.value
+      val uj = useJCenter.value
+      appRepositories(ac) map { ars => Resolver.reorganizeAppResolvers(ars, uj, true) }
+    },
     bootResolvers <<= appConfiguration map bootRepositories,
     fullResolvers <<= (projectResolver, externalResolvers, sbtPlugin, sbtResolver, bootResolvers, overrideBuildResolvers) map { (proj, rs, isPlugin, sbtr, boot, overrideFlag) =>
       boot match {
@@ -1625,6 +1628,7 @@ object Classpaths {
       }
     }
 
+  @deprecated("This is no longer used.", "0.13.10")
   def exportProductsTask: Initialize[Task[Classpath]] = Def.task {
     val art = (artifact in packageBin).value
     val module = projectID.value
@@ -1744,7 +1748,7 @@ object Classpaths {
     track match {
       case TrackLevel.NoTracking     => getClasspath(exportedProductsNoTracking, dep, conf, data)
       case TrackLevel.TrackIfMissing => getClasspath(exportedProductsIfMissing, dep, conf, data)
-      case TrackLevel.TrackAlways    => getClasspath(exportedProductsAlways, dep, conf, data)
+      case TrackLevel.TrackAlways    => getClasspath(exportedProducts, dep, conf, data)
     }
   private[sbt] def unmanagedLibs0(dep: ResolvedReference, conf: String, data: Settings[Scope], track: TrackLevel): Task[Classpath] =
     unmanagedLibs(dep, conf, data)

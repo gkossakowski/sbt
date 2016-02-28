@@ -36,7 +36,8 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
   }
 
   /** Invalidates sources based on initially detected 'changes' to the sources, products, and dependencies.*/
-  override protected def invalidateByExternal(relations: Relations, externalAPIChange: APIChange, classToSrcMapper: ClassToSourceMapper): Set[String] = {
+  override protected def invalidateByExternal(relations: Relations, externalAPIChange: APIChange,
+    isScalaClass: String => Boolean): Set[String] = {
     val modified = externalAPIChange.modifiedClass
     val invalidationReason = memberRefInvalidator.invalidationReason(externalAPIChange)
     log.debug(s"$invalidationReason\nAll member reference dependencies will be considered within this context.")
@@ -50,9 +51,9 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
     }
     val localInheritance = relations.localInheritance.external.reverse(modified)
     val memberRefInvalidationInternal = memberRefInvalidator.get(relations.memberRef.internal,
-      relations.names, externalAPIChange, classToSrcMapper)
+      relations.names, externalAPIChange, isScalaClass)
     val memberRefInvalidationExternal = memberRefInvalidator.get(relations.memberRef.external,
-      relations.names, externalAPIChange, classToSrcMapper)
+      relations.names, externalAPIChange, isScalaClass)
 
     // Get the member reference dependencies of all sources transitively invalidated by inheritance
     log.debug("Getting direct dependencies of all sources transitively invalidated by inheritance.")
@@ -79,7 +80,7 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
     localInheritanceDeps
   }
 
-  override protected def invalidateClass(relations: Relations, change: APIChange, classToSourceMapper: ClassToSourceMapper): Set[String] = {
+  override protected def invalidateClass(relations: Relations, change: APIChange, isScalaClass: String => Boolean): Set[String] = {
     log.debug(s"Invalidating ${change.modifiedClass}...")
     val modifiedClass = change.modifiedClass
     val transitiveInheritance = invalidateByInheritance(relations, modifiedClass)
@@ -87,7 +88,7 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
     val reasonForInvalidation = memberRefInvalidator.invalidationReason(change)
     log.debug(s"$reasonForInvalidation\nAll member reference dependencies will be considered within this context.")
     val memberRefSrcDeps = relations.memberRef.internal
-    val memberRefInvalidation = memberRefInvalidator.get(memberRefSrcDeps, relations.names, change, classToSourceMapper)
+    val memberRefInvalidation = memberRefInvalidator.get(memberRefSrcDeps, relations.names, change, isScalaClass)
     val memberRef = transitiveInheritance flatMap memberRefInvalidation
     val all = transitiveInheritance ++ localInheritance ++ memberRef
     all

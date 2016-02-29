@@ -54,7 +54,6 @@ final class API(val global: CallbackGlobal) extends Compat {
         debug("The " + sourceFile + " contains the following declared classes " + declaredClasses)
         declaredClasses foreach { (declaredClass: String) => callback.declaredClass(sourceFile, declaredClass) }
       }
-      extractApi.forceStructures()
       val classApis = traverser.allNonLocalClasses
 
       classApis.foreach(callback.api(sourceFile, _))
@@ -63,7 +62,6 @@ final class API(val global: CallbackGlobal) extends Compat {
 
   private final class TopLevelHandler(extractApi: ExtractAPI[global.type]) extends TopLevelTraverser {
     def allNonLocalClasses: Set[ClassLike] = {
-      extractApi.forceStructures()
       extractApi.allExtractedNonLocalClasses
     }
     def `class`(c: Symbol): Unit = {

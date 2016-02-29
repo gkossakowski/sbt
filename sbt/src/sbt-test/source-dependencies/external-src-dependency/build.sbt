@@ -1,5 +1,8 @@
-lazy val provider = project
-lazy val use = project.dependsOn(provider)
+lazy val commonSettings = Seq(
+  logLevel := Level.Debug
+)
+lazy val provider = project.settings(commonSettings)
+lazy val use = project.settings(commonSettings).dependsOn(provider)
 
 InputKey[Unit]("check-number-of-compiler-iterations") <<= inputTask { (argTask: TaskKey[Seq[String]]) =>
   (argTask, compile in Compile in use) map { (args: Seq[String], a: sbt.inc.Analysis) =>

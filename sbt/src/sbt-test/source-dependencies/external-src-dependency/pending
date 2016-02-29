@@ -1,0 +1,5 @@
+> compile
+
+$ copy-file changes/A.scala provider/A.scala
+> compile
+> check-number-of-compiler-iterations 1

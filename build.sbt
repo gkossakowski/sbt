@@ -99,7 +99,7 @@ lazy val interfaceProj = (project in file("interface")).
 // defines operations on the API of a source, including determining whether it has changed and converting it to a string
 //   and discovery of Projclasses and annotations
 lazy val apiProj = (project in compilePath / "api").
-  dependsOn(interfaceProj, classfileProj).
+  dependsOn(interfaceProj, classfileProj % "compile;test->test").
   settings(
     testedBaseSettings,
     name := "API"

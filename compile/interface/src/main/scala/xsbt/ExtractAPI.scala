@@ -418,13 +418,6 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
   // but that does not take linearization into account.
   def linearizedAncestorTypes(info: Type): List[Type] = info.baseClasses.tail.map(info.baseType)
 
-  // If true, this template is publicly visible and should be processed as a public inheritance dependency.
-  // Local classes and local refinements will never be traversed by the api phase, so we don't need to check for that.
-  private[this] def isPublicStructure(s: Symbol): Boolean =
-    s.isStructuralRefinement ||
-      // do not consider templates that are private[this] or private
-      !(s.isPrivate && (s.privateWithin == NoSymbol || s.isLocal))
-
   private def mkStructure(s: Symbol, bases: List[Type], declared: List[Symbol], inherited: List[Symbol]): xsbti.api.Structure = {
     new xsbti.api.Structure(lzy(types(s, bases)), lzy(processDefinitions(s, declared)), lzy(processDefinitions(s, inherited)))
   }
@@ -647,8 +640,7 @@ class ExtractAPI[GlobalType <: CallbackGlobal](val global: GlobalType,
     val structureWithoutMembers = lzy(mkStructureWithEmptyMembers(info, sym))
     val classWithoutMembers = constructClass(structureWithoutMembers)
 
-    if (isPublicStructure(sym))
-      allNonLocalClassesInSrc += classWithMembers
+    allNonLocalClassesInSrc += classWithMembers
 
     classWithoutMembers
   }

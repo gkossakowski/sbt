@@ -18,7 +18,7 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
   //  This might be too conservative: we probably only need package objects for packages of invalidated sources.
   protected def invalidatedPackageObjects(invalidatedClasses: Set[String], relations: Relations,
     apis: APIs): Set[String] = {
-    transitiveDeps(invalidatedClasses)(relations.inheritance.internal.reverse) filter {
+    transitiveDeps(invalidatedClasses, logging = false)(relations.inheritance.internal.reverse) filter {
       className => APIUtil.hasPackageObject(apis.internalAPI(className))
     }
   }

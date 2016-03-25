@@ -76,7 +76,7 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
   private def invalidateByLocalInheritance(relations: Relations, modified: String): Set[String] = {
     val localInheritanceDeps = relations.localInheritance.internal.reverse(modified)
     if (localInheritanceDeps.nonEmpty)
-      log.debug("Invalidated by local inheritance dependency: " + localInheritanceDeps)
+      log.debug(s"Invalidate by local inheritance: $modified -> $localInheritanceDeps")
     localInheritanceDeps
   }
 
@@ -84,7 +84,7 @@ private final class IncrementalNameHashing(log: Logger, options: IncOptions) ext
     log.debug(s"Invalidating ${change.modifiedClass}...")
     val modifiedClass = change.modifiedClass
     val transitiveInheritance = invalidateByInheritance(relations, modifiedClass)
-    val localInheritance = invalidateByLocalInheritance(relations, modifiedClass)
+    val localInheritance = transitiveInheritance.flatMap(invalidateByLocalInheritance(relations, _))
     val reasonForInvalidation = memberRefInvalidator.invalidationReason(change)
     log.debug(s"$reasonForInvalidation\nAll member reference dependencies will be considered within this context.")
     val memberRefSrcDeps = relations.memberRef.internal

@@ -28,9 +28,8 @@ TaskKey[Unit]("check-compilations") := {
   // A is explicitly changed
   recompiledClassesInIteration(1, Set("A"))
   // B is recompiled because it depends by inheritance on A
-  recompiledClassesInIteration(2, Set("B"))
-  // C is recompiled because it depends by local inheritance on B
-  // it should have been included in the second iteration together with A
-  recompiledClassesInIteration(3, Set("C"))
-  assert(allCompilations.size == 4, s"The total number of compilation iterations is ${allCompilations.size}")
+  // C is recompiled because it depends by local inheritance on B but its
+  // dependencies (D) are not recompiled
+  recompiledClassesInIteration(2, Set("B", "C"))
+  assert(allCompilations.size == 3, s"The total number of compilation iterations is ${allCompilations.size}")
 }

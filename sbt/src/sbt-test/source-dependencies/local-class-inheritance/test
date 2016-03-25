@@ -5,4 +5,5 @@
 > compile
 
 $ copy-file changes/A2.scala A.scala
--> compile
+> compile
+> checkCompilations

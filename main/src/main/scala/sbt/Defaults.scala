@@ -506,17 +506,19 @@ object Defaults extends BuildCommon {
         val succeeded = TestStatus.read(succeededFile(s.cacheDirectory))
         val stamps = collection.mutable.Map.empty[File, Long]
         def stamp(dep: String): Long = {
-          val stamps = for (a <- ans; f <- a.relations.definesClass(dep)) yield intlStamp(f, a, Set.empty)
+          val stamps = for (a <- ans) yield intlStamp(dep, a, Set.empty)
           if (stamps.isEmpty) Long.MinValue else stamps.max
         }
-        def intlStamp(f: File, analysis: Analysis, s: Set[File]): Long = {
-          if (s contains f) Long.MinValue else
-            stamps.getOrElseUpdate(f, {
+        def intlStamp(clsName: String, analysis: Analysis, s: Set[String]): Long = {
+          if (s contains clsName) Long.MinValue else {
+            val srcFile = analysis.relations.definesClass(clsName).head
+            stamps.getOrElseUpdate(srcFile, {
               import analysis.{ relations => rel, apis }
-              rel.internalSrcDeps(f).map(intlStamp(_, analysis, s + f)) ++
-                rel.externalDeps(f).map(stamp) +
-                apis.internal(f).compilation.startTime
+              rel.internalClassDeps(clsName).map(intlStamp(_, analysis, s + clsName)) ++
+                rel.externalDeps(clsName).map(stamp) +
+                apis.internal(clsName).compilation.startTime
             }.max)
+          }
         }
         def noSuccessYet(test: String) = succeeded.get(test) match {
           case None     => true

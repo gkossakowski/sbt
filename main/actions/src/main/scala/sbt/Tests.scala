@@ -273,7 +273,15 @@ object Tests {
   def discover(frameworks: Seq[Framework], analysis: CompileAnalysis, log: Logger): (Seq[TestDefinition], Set[String]) =
     discover(frameworks flatMap TestFramework.getFingerprints, allDefs(analysis), log)
 
-  def allDefs(analysis: CompileAnalysis) = analysis match { case analysis: Analysis => analysis.apis.internal.values.flatMap(_.api.definitions).toSeq }
+  def allDefs(analysis: CompileAnalysis): Seq[xsbti.api.ClassLike] = {
+    def companionsApis(c: xsbti.api.Companions) = Seq(c.classApi, c.objectApi)
+    analysis match {
+      case analysis: Analysis =>
+        analysis.apis.internal.values.flatMap(x => companionsApis(x.api)).toSeq
+
+    }
+  }
+
   def discover(fingerprints: Seq[Fingerprint], definitions: Seq[Definition], log: Logger): (Seq[TestDefinition], Set[String]) =
     {
       val subclasses = fingerprints collect { case sub: SubclassFingerprint => (sub.superclassName, sub.isModule, sub) };

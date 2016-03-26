@@ -68,6 +68,30 @@ object Defaults extends BuildCommon {
       val m = (for (a <- cp; an <- a.metadata get Keys.analysis) yield (a.data, an)).toMap
       m.get _
     }
+
+  def analysisLookupFromClasspath(cp: Seq[Attributed[File]]): xsbti.compile.AnalysisLookup = {
+    val ans = for (a <- cp; an <- a.metadata get Keys.analysis) yield an
+    new AnalysisLookupImpl(ans)
+  }
+
+  class AnalysisLookupImpl(analyses: Seq[CompileAnalysis]) extends xsbti.compile.AnalysisLookup {
+    import sbt.util.InterfaceUtil
+    import InterfaceUtil.o2m
+    override def lookupAnalysis(classFile: File): Maybe[CompileAnalysis] = {
+      o2m(analyses collectFirst {
+        case (a: Analysis) if a.relations.allProducts contains classFile => a
+      })
+    }
+    override def lookupAnalysis(binaryDependency: File, binaryClassName: String): Maybe[CompileAnalysis] = {
+      lookupAnalysis(binaryClassName)
+    }
+    override def lookupAnalysis(binaryClassName: String): Maybe[CompileAnalysis] = {
+      o2m(analyses collectFirst {
+        case (a: Analysis) if a.relations.binaryClassName._2s contains binaryClassName => a
+      })
+    }
+  }
+
   private[sbt] def globalDefaults(ss: Seq[Setting[_]]): Seq[Setting[_]] = Def.defaultSettings(inScope(GlobalScope)(ss))
 
   def buildCore: Seq[Setting[_]] = thisBuildCore ++ globalCore
@@ -884,7 +908,7 @@ object Defaults extends BuildCommon {
       f => new DefinesClass { override def apply(className: String): Boolean = dc(f)(className) }
     }
     new Setup(
-      f1(t => o2m(analysisMap(dependencyClasspath.value)(t))),
+      analysisLookupFromClasspath(dependencyClasspath.value),
       f1(dc),
       (skip in compile).value,
       // TODO - this is kind of a bad way to grab the cache directory for streams...

@@ -20,7 +20,7 @@ def buildLevelSettings: Seq[Setting[_]] = inThisBuild(Seq(
 ))
 
 def commonSettings: Seq[Setting[_]] = Seq[SettingsDefinition](
-  scalaVersion := scala210,
+  scalaVersion := scala211,
   publishArtifact in packageDoc := false,
   publishMavenStyle := false,
   componentID := None,
@@ -32,7 +32,7 @@ def commonSettings: Seq[Setting[_]] = Seq[SettingsDefinition](
   testOptions += Tests.Argument(TestFrameworks.ScalaCheck, "-w", "1"),
   javacOptions in compile ++= Seq("-target", "6", "-source", "6", "-Xlint", "-Xlint:-serial"),
   incOptions := incOptions.value.withNameHashing(true),
-  crossScalaVersions := Seq(scala210),
+  crossScalaVersions := Seq(scala211),
   bintrayPackage := (bintrayPackage in ThisBuild).value,
   bintrayRepository := (bintrayRepository in ThisBuild).value,
   mimaDefaultSettings,
